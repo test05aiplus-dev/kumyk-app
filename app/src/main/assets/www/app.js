@@ -252,6 +252,8 @@
     next();
   }
   function canSay(text) { return !!AUDIO[audioKey(text)] || store.settings.tts; }
+  var CHEV_L = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 5l-7 7 7 7"/></svg>';
+  var CHEV_R = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 5l7 7-7 7"/></svg>';
   var SPEAKER = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9h4l5-4v14l-5-4H4z"/><path d="M16.5 8.5a5 5 0 010 7M19 6a8.5 8.5 0 010 12"/></svg>';
   function sayBtn(text, extra) {
     return '<button class="say' + (extra ? " " + extra : "") + '" data-say="' + esc(text) + '" aria-label="Произнести «' + esc(text) + '»">' + SPEAKER + '</button>';
@@ -449,34 +451,63 @@
     var due = l.words.filter(function (w) { return srsGet(w[0]).due <= now; });
     var deck = shuffle(due.length ? due : l.words);
     var reviewAll = !due.length;
-    var i = 0, known = 0, total = deck.length;
+    var i = 0, known = 0, skipped = 0, total = deck.length;
+    var history = []; // для кнопки «Назад»: состояние до каждого шага
+
+    function snapshot(w) {
+      var prev = store.srs[w[0]];
+      history.push({ i: i, known: known, skipped: skipped, deckLen: deck.length, key: w[0],
+                     srs: prev ? { box: prev.box, due: prev.due } : null, xp: store.xp });
+    }
+    function back() {
+      var h = history.pop();
+      if (!h) return;
+      i = h.i; known = h.known; skipped = h.skipped;
+      deck.length = h.deckLen;
+      if (h.srs) store.srs[h.key] = h.srs; else delete store.srs[h.key];
+      store.xp = h.xp;
+      save();
+      draw();
+    }
 
     function draw() {
       if (i >= deck.length) return done();
       var w = deck[i];
       view.innerHTML =
         (reviewAll && i === 0 ? '<p class="small muted">Все слова урока уже повторены вовремя. Можно пройтись ещё раз.</p>' : '') +
-        '<div class="counter"><span>Карточка ' + (i + 1) + ' из ' + total + '</span><span>Помню: ' + known + '</span></div>' +
-        '<div class="progress"><i style="width:' + (i / total * 100) + '%"></i></div>' +
+        '<div class="counter"><span>Карточка ' + (i + 1) + ' из ' + deck.length + '</span><span>Помню: ' + known + '</span></div>' +
+        '<div class="progress"><i style="width:' + (i / deck.length * 100) + '%"></i></div>' +
         '<div class="card-stage"><div class="flash" id="flash" role="button" tabindex="0" aria-label="Перевернуть карточку">' +
           '<div class="face front">' + sayBtn(w[0], "corner") + '<div class="big kum">' + esc(w[0]) + '</div><div class="hint">Нажмите, чтобы перевернуть</div></div>' +
           '<div class="face back"><div class="big">' + esc(w[1]) + '</div><div class="hint">Помните это слово?</div></div>' +
         '</div></div>' +
-        '<div class="row"><button class="btn ghost" id="no">Не помню</button><button class="btn" id="yes">Помню</button></div>';
+        '<div class="row"><button class="btn ghost" id="no">Не помню</button><button class="btn" id="yes">Помню</button></div>' +
+        '<div class="card-nav">' +
+          '<button class="nav-btn" id="prev"' + (history.length ? '' : ' disabled') + '>' + CHEV_L + '<span>Назад</span></button>' +
+          '<button class="nav-btn" id="skip"><span>Дальше</span>' + CHEV_R + '</button>' +
+        '</div>' +
+        '<button class="skip-all" id="skipAll">Пропустить всё и перейти к спринту</button>';
       var f = document.getElementById("flash");
       if (store.settings.autoCards && canSay(w[0])) timers.push(setTimeout(function () { say(w[0]); }, 250));
       function flip() { f.classList.toggle("flipped"); }
       f.onclick = flip;
       f.onkeydown = function (e) { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); flip(); } };
-      document.getElementById("yes").onclick = function () { srsAnswer(w[0], true); known++; addXp(2); i++; draw(); };
-      document.getElementById("no").onclick = function () { srsAnswer(w[0], false); deck.push(w); i++; draw(); };
+      document.getElementById("yes").onclick = function () { snapshot(w); srsAnswer(w[0], true); known++; addXp(2); i++; draw(); };
+      document.getElementById("no").onclick = function () { snapshot(w); srsAnswer(w[0], false); deck.push(w); i++; draw(); };
+      // «Дальше» — пропустить слово без оценки, интервалы повторения не меняются
+      document.getElementById("skip").onclick = function () { snapshot(w); skipped++; i++; draw(); };
+      document.getElementById("prev").onclick = back;
+      document.getElementById("skipAll").onclick = function () { location.hash = nextStepHref(l, "cards"); };
     }
     function done() {
       completeStep(l.id, "cards");
       view.innerHTML = '<div class="result"><div class="big">' + known + '/' + total + '</div>' +
-        '<p>Слова, которые вы помните, вернутся через 1, 2, 4, 8 дней — так они переходят в долгую память.</p>' +
+        '<p>' + (skipped ? 'Пропущено: ' + skipped + '. ' : '') + 'Слова, которые вы помните, вернутся через 1, 2, 4, 8 дней — так они переходят в долгую память.</p>' +
         '<div class="stack"><a class="btn block" href="' + nextStepHref(l, "cards") + '">Дальше: Спринт</a>' +
+        (history.length ? '<button class="btn block soft" id="lastBack">Вернуться к последней карточке</button>' : '') +
         '<a class="btn block soft" href="#/lesson/' + l.id + '">К уроку</a></div></div>';
+      var lb = document.getElementById("lastBack");
+      if (lb) lb.onclick = back;
     }
     draw();
   }

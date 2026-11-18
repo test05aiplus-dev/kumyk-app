@@ -217,6 +217,12 @@ p { margin: 0 0 10px; }
 .face.back .big { font-family: var(--sans); font-size: 30px; font-weight: 500; }
 .face .hint { position: absolute; bottom: 16px; font-size: 13px; color: var(--muted); }
 .face.back .hint { color: #C9CFEA; }
+.card-nav { display: flex; justify-content: space-between; margin-top: 12px; }
+.nav-btn { display: inline-flex; align-items: center; gap: 4px; min-height: 44px; padding: 0 12px; border: 0; border-radius: 999px; background: none; color: var(--indigo); font-weight: 600; font-size: 15px; }
+.nav-btn svg { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; }
+.nav-btn:active { background: #E7EAF6; }
+.nav-btn[disabled] { color: #B4B9CE; }
+.skip-all { display: block; margin: 10px auto 0; min-height: 44px; padding: 0 16px; border: 0; background: none; color: var(--muted); font-size: 14.5px; text-decoration: underline; text-underline-offset: 3px; }
 .progress { height: 6px; background: var(--line); border-radius: 3px; overflow: hidden; margin: 4px 0 14px; }
 .progress i { display: block; height: 100%; background: var(--saffron); transition: width .3s; }
 .counter { font-size: 14px; color: var(--muted); display: flex; justify-content: space-between; }

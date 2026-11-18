@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Ромб-«гёз» из кумыкского ковра: шафрановый, внутри гранатовый, по бокам малые ромбы -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp" android:height="108dp"
+    android:viewportWidth="108" android:viewportHeight="108">
+    <path android:fillColor="#FFE3A52B" android:pathData="M54,27 L77,54 L54,81 L31,54 Z" />
+    <path android:fillColor="#FF22306B" android:pathData="M54,35 L70,54 L54,73 L38,54 Z" />
+    <path android:fillColor="#FFB8243C" android:pathData="M54,42 L64,54 L54,66 L44,54 Z" />
+    <path android:fillColor="#FFE3A52B" android:pathData="M54,50 L57.5,54 L54,58 L50.5,54 Z" />
+    <path android:fillColor="#FFB8243C" android:pathData="M27,48 L32,54 L27,60 L22,54 Z" />
+    <path android:fillColor="#FFB8243C" android:pathData="M81,48 L86,54 L81,60 L76,54 Z" />
+</vector>

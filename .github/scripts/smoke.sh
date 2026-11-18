@@ -14,7 +14,7 @@ adb logcat -d | grep -E "AndroidRuntime|FATAL|ru.kumyk|chromium|WebView" | head 
 echo "===== SCREEN ====="
 adb exec-out screencap -p > /tmp/s.png
 echo "PNG_B64_START"
-base64 -w0 /tmp/s.png
+base64 -w 76 /tmp/s.png
 echo
 echo "PNG_B64_END"
 exit 0

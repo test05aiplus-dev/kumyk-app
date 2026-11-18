@@ -41,7 +41,6 @@ public class MainActivity extends Activity {
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        goEdgeToEdge();
 
         FrameLayout root = new FrameLayout(this);
         root.setBackgroundColor(Color.WHITE);
@@ -57,6 +56,9 @@ public class MainActivity extends Activity {
 
         root.setOnApplyWindowInsetsListener(this::applyInsets);
         setContentView(root);
+        // Только после setContentView: до этого у окна ещё нет DecorView,
+        // и getInsetsController() на Android 11+ падает с NullPointerException.
+        goEdgeToEdge();
 
         WebSettings s = web.getSettings();
         s.setJavaScriptEnabled(true);

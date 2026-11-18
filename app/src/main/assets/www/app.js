@@ -316,7 +316,7 @@
     var ls = lessonState(next.id);
     var stepsDone = Object.keys(ls.steps).length;
 
-    view.innerHTML =
+    view.innerHTML = installTip() +
       '<section class="wod">' +
         '<div class="label">Слово дня</div>' +
         '<div class="word-row"><p class="word kum">' + esc(w.k) + '</p>' + sayBtn(w.k, "light") + '</div>' +
@@ -343,6 +343,11 @@
         link("#/lessons", "🗺️", "Программа курса", STAGES.length + " " + plural(STAGES.length, "этап", "этапа", "этапов") + " от алфавита до речи") +
       '</nav>';
 
+    var ht = document.getElementById("hideTip");
+    if (ht) ht.onclick = function () {
+      try { localStorage.setItem("kumyk-hide-install", "1"); } catch (e) {}
+      var t = document.getElementById("installTip"); if (t) t.remove();
+    };
     document.getElementById("wodBtn").onclick = function () {
       var tr = document.getElementById("wodTr");
       var hidden = tr.classList.toggle("hidden");
@@ -1037,6 +1042,24 @@
       if (!armed) { armed = true; this.textContent = "Нажмите ещё раз, чтобы стереть всё"; this.classList.add("accent"); this.classList.remove("ghost"); return; }
       store = blank(); save(); toast("Прогресс сброшен"); profile();
     };
+  }
+
+  /* ================= версия «на экран Домой» ================= */
+  var inNativeApp = !!window.KumykNative;
+  var isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+  var standalone = window.navigator.standalone === true ||
+    (window.matchMedia && window.matchMedia("(display-mode: standalone)").matches);
+  if (!inNativeApp && "serviceWorker" in navigator && (location.protocol === "https:" || location.hostname === "localhost")) {
+    window.addEventListener("load", function () {
+      navigator.serviceWorker.register("sw.js").catch(function () {});
+    });
+  }
+  function installTip() {
+    if (inNativeApp || standalone || !isIOS) return "";
+    try { if (localStorage.getItem("kumyk-hide-install")) return ""; } catch (e) {}
+    return '<div class="install-tip" id="installTip"><b>Установите на iPhone</b>' +
+      '<p>Нажмите «Поделиться» внизу Safari, затем «На экран Домой». Приложение откроется без браузера и будет работать без интернета.</p>' +
+      '<button id="hideTip">Понятно</button></div>';
   }
 
   /* ================= старт ================= */

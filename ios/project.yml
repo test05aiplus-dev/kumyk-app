@@ -1,0 +1,61 @@
+# Проект Xcode собирается командой `xcodegen generate` (brew install xcodegen).
+# Интерфейс берётся из той же папки, что и у Android: ../app/src/main/assets/www
+name: KumykTil
+options:
+  bundleIdPrefix: ru.kumyk
+  deploymentTarget:
+    iOS: "15.0"
+  developmentLanguage: ru
+settings:
+  base:
+    MARKETING_VERSION: "1.0"
+    CURRENT_PROJECT_VERSION: "1"
+    SWIFT_VERSION: "5.0"
+    ENABLE_USER_SCRIPT_SANDBOXING: NO
+targets:
+  KumykTil:
+    type: application
+    platform: iOS
+    sources:
+      - path: KumykTil
+      - path: ../app/src/main/assets/www
+        type: folder
+        buildPhase: resources
+    info:
+      path: KumykTil/Info.plist
+      properties:
+        CFBundleDisplayName: "Къумукъ тил"
+        CFBundleDevelopmentRegion: ru
+        UILaunchScreen:
+          UIColorName: LaunchBackground
+        UISupportedInterfaceOrientations:
+          - UIInterfaceOrientationPortrait
+        UISupportedInterfaceOrientations~ipad:
+          - UIInterfaceOrientationPortrait
+          - UIInterfaceOrientationPortraitUpsideDown
+          - UIInterfaceOrientationLandscapeLeft
+          - UIInterfaceOrientationLandscapeRight
+        UIViewControllerBasedStatusBarAppearance: true
+        ITSAppUsesNonExemptEncryption: false
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: ru.kumyk.app
+        TARGETED_DEVICE_FAMILY: "1,2"
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+    scheme: {}
+    postBuildScripts:
+      - name: Список аудиозаписей
+        basedOnDependencyAnalysis: false
+        script: |
+          AUDIO_DIR="${SRCROOT}/../app/src/main/assets/www/audio"
+          OUT="${TARGET_BUILD_DIR}/${UNLOCALIZED_RESOURCES_FOLDER_PATH}/www/audio-list.js"
+          LIST=""
+          if [ -d "$AUDIO_DIR" ]; then
+            while IFS= read -r f; do
+              n=$(basename "$f")
+              n=${n//\\/\\\\}
+              n=${n//\"/\\\"}
+              LIST="${LIST}${LIST:+,}\"${n}\""
+            done < <(find "$AUDIO_DIR" -maxdepth 1 -type f \( -iname '*.mp3' -o -iname '*.m4a' -o -iname '*.ogg' -o -iname '*.wav' -o -iname '*.aac' \) | sort)
+          fi
+          echo "window.AUDIO_FILES = [${LIST}];" > "$OUT"

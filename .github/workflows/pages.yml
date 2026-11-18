@@ -1,0 +1,47 @@
+name: Сайт для iPhone (экран «Домой»)
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    outputs:
+      enabled: ${{ steps.pages.outcome == 'success' }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: GitHub Pages включён?
+        id: pages
+        continue-on-error: true
+        uses: actions/configure-pages@v5
+      - name: Подсказка
+        if: steps.pages.outcome != 'success'
+        run: echo "::notice::GitHub Pages ещё не включён. Settings → Pages → Source: GitHub Actions (для бесплатного аккаунта репозиторий должен быть публичным)."
+      - name: Сборка сайта
+        run: bash .github/scripts/build-web.sh
+      - uses: actions/upload-pages-artifact@v3
+        if: steps.pages.outcome == 'success'
+        with:
+          path: site
+
+  deploy:
+    needs: build
+    if: needs.build.outputs.enabled == 'true'
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4

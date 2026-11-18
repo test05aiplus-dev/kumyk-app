@@ -6,3 +6,10 @@ local.properties
 *.iml
 captures/
 *.keystore
+site/
+ios/build/
+ios/KumykTil.xcodeproj/
+ios/Payload/
+ios/*.ipa
+ios/*.zip
+ios/KumykTil/Info.plist

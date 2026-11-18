@@ -1,0 +1,46 @@
+name: Сборка iOS
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  ios:
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Генерация проекта Xcode
+        run: |
+          brew install xcodegen
+          cd ios && xcodegen generate
+
+      - name: Сборка для симулятора
+        run: |
+          cd ios
+          xcodebuild -project KumykTil.xcodeproj -target KumykTil -sdk iphonesimulator \
+            -configuration Debug CODE_SIGNING_ALLOWED=NO SYMROOT=build build | tail -40
+          test -d build/Debug-iphonesimulator/KumykTil.app
+
+      - name: Запуск в симуляторе
+        run: bash .github/scripts/ios-smoke.sh
+
+      - name: Сборка для iPhone без подписи
+        run: |
+          cd ios
+          xcodebuild -project KumykTil.xcodeproj -target KumykTil -sdk iphoneos \
+            -configuration Release CODE_SIGNING_ALLOWED=NO SYMROOT=build build | tail -20
+          mkdir -p Payload && cp -R build/Release-iphoneos/KumykTil.app Payload/
+          zip -qry KumykTil-unsigned.ipa Payload
+
+      - name: Проект Xcode для открытия на Mac
+        run: |
+          cd ios && zip -qry KumykTil-xcode-project.zip KumykTil.xcodeproj project.yml KumykTil
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: KumykTil-ios
+          path: |
+            ios/KumykTil-unsigned.ipa
+            ios/KumykTil-xcode-project.zip

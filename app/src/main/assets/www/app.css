@@ -238,6 +238,18 @@ p { margin: 0 0 10px; }
 .explain.ok { background: var(--moss-bg); color: #1D5E43; }
 .explain.bad { background: var(--pom-bg); color: #861A2C; }
 .explain b { display: block; margin-bottom: 2px; }
+.q-card { position: relative; }
+.q-card.has-say .q { padding-right: 46px; }
+.q-card .say.corner { top: 14px; right: 12px; }
+.opt { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.opt-t { flex: 1; }
+.say.opt-say { width: 34px; height: 34px; }
+.say.opt-say svg { width: 18px; height: 18px; }
+.listen { display: flex; align-items: center; gap: 10px; width: 100%; margin-top: 10px; padding: 10px 12px; border: 0; border-radius: var(--r-sm); background: rgba(255,255,255,.65); color: inherit; text-align: left; font-size: 17px; }
+.listen svg { flex: none; width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; }
+.listen svg path:first-child { fill: currentColor; }
+.sprint-card { position: relative; }
+.sprint-card .say.corner { top: 12px; right: 12px; }
 
 /* ---------- спринт ---------- */
 .sprint-top { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }

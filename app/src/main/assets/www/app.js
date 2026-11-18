@@ -500,7 +500,7 @@
       view.innerHTML =
         '<div class="sprint-top"><div class="score" id="sc">0</div><div class="combo" id="cb">x1</div></div>' +
         '<div class="timer" id="tm"><i style="width:100%"></i></div>' +
-        '<div class="sprint-card" id="card"><div class="w kum" id="sw"></div><div class="eq">это</div><div class="t" id="st"></div></div>' +
+        '<div class="sprint-card" id="card">' + sayBtn("", "corner") + '<div class="w kum" id="sw"></div><div class="eq">это</div><div class="t" id="st"></div></div>' +
         '<div class="row sprint-btns"><button class="btn no" id="bn">Неверно</button><button class="btn yes" id="by">Верно</button></div>' +
         '<p class="muted small" style="text-align:center;margin-top:10px">Правильных: <span id="rc">0</span>, ошибок: <span id="wc">0</span></p>';
       var card = document.getElementById("card");
@@ -515,6 +515,9 @@
         }
         cur = { truth: truth };
         document.getElementById("sw").textContent = w.k;
+        var sb = card.querySelector(".say");
+        sb.setAttribute("data-say", w.k);
+        sb.setAttribute("aria-label", "Произнести «" + w.k + "»");
         document.getElementById("st").textContent = shown;
       }
       function answer(said) {
@@ -563,6 +566,75 @@
   }
 
   /* ================= вопросы (общий движок) ================= */
+  /* Как понять, что строка на кумыкском: слова из уроков, словаря, примеров и диалогов */
+  var KUM_TOKENS = {};
+  function addKum(t) {
+    audioKey(t).split(/[\s\-]+/).forEach(function (w) { if (w && !/^\d+$/.test(w)) KUM_TOKENS[w] = 1; });
+  }
+  LESSONS.forEach(function (l) {
+    l.words.forEach(function (w) { addKum(w[0]); });
+    l.theory.forEach(function (t) { (t.ex || []).forEach(function (e) { e[0].split("→").forEach(addKum); }); });
+  });
+  window.EXTRA_DICT.forEach(function (w) { addKum(w[0]); });
+  window.DIALOGS.forEach(function (d) { d.lines.forEach(function (ln) { addKum(ln[1]); }); });
+  window.PROVERBS.forEach(function (p) { addKum(p[0]); });
+  var RU_TOKENS = {};
+  function addRu(t) { audioKey(t).split(/[\s\-,\/]+/).forEach(function (w) { if (w) RU_TOKENS[w] = 1; }); }
+  LESSONS.forEach(function (l) {
+    l.words.forEach(function (w) { addRu(w[1]); });
+    l.theory.forEach(function (t) { (t.ex || []).forEach(function (e) { addRu(e[1]); }); });
+  });
+  window.EXTRA_DICT.forEach(function (w) { addRu(w[1]); });
+  window.DIALOGS.forEach(function (d) { d.lines.forEach(function (ln) { addRu(ln[2]); }); });
+  window.PROVERBS.forEach(function (p) { addRu(p[1]); });
+  var KUM_STEMS = Object.keys(KUM_TOKENS).filter(function (w) { return w.length >= 3; });
+  function kumToken(w) {
+    if (KUM_TOKENS[w]) return true;
+    if (RU_TOKENS[w]) return false;
+    for (var j = 0; j < KUM_STEMS.length; j++) if (w.indexOf(KUM_STEMS[j]) === 0) return true;
+    return false;
+  }
+  function isKum(text) {
+    var k = audioKey(text);
+    if (!k || /^[\d\s+\-=?%]+$/.test(k) || k.charAt(0) === "-") return false;
+    if (/къ|гъ|гь|оь|уь/.test(k)) return true;
+    var toks = k.split(/[\s\-]+/).filter(Boolean);
+    // слова, одинаковые в обоих языках («он», «чай»), сами по себе ничего не решают
+    var known = toks.filter(function (w) { return kumToken(w) && !RU_TOKENS[w]; }).length;
+    var shared = toks.filter(function (w) { return KUM_TOKENS[w] && RU_TOKENS[w]; }).length;
+    return known > 0 && (known + shared) * 2 >= toks.length;
+  }
+  // Варианты ответа: если хоть один вариант кумыкский, кумыкскими считаем и
+  // остальные незнакомые формы (неверные окончания вроде «итлар»), но не русские слова
+  function kumOptions(options, explicit) {
+    if (explicit === true || explicit === false) return options.map(function () { return explicit; });
+    var flags = options.map(isKum);
+    if (flags.indexOf(true) < 0) return flags;
+    return options.map(function (o, j) {
+      if (flags[j]) return true;
+      var k = audioKey(o);
+      if (!/[а-яё]/.test(k) || k.charAt(0) === "-") return false;
+      return k.split(/[\s\-]+/).every(function (w) { return !RU_TOKENS[w]; });
+    });
+  }
+  // Кумыкский фрагмент вопроса: слово в «кавычках» или предложение с пропуском ___
+  function questionKum(q) {
+    var m = q.match(/«([^»]+)»/g) || [];
+    for (var j = 0; j < m.length; j++) {
+      var inner = m[j].slice(1, -1);
+      if (isKum(inner)) return inner;
+    }
+    return null;
+  }
+  function filledSentence(q, answer) {
+    if (q.indexOf("___") < 0) return null;
+    var base = q.split(" (")[0];
+    return base.replace("___", answer);
+  }
+  function optSay(text) {
+    return '<span class="say opt-say" data-say="' + esc(text) + '" role="button" aria-label="Произнести «' + esc(text) + '»">' + SPEAKER + '</span>';
+  }
+
   function quiz(opts) {
     // opts: items [{q, options, a, why}], onDone(right,total), header
     var items = opts.items, i = 0, right = 0;
@@ -570,12 +642,15 @@
       if (i >= items.length) return opts.onDone(right, items.length);
       var it = items[i];
       var order = shuffle(it.options.map(function (o, idx) { return idx; }));
+      var qk = questionKum(it.q);
+      var kf = kumOptions(it.options, it.kum);
       view.innerHTML =
         '<div class="counter"><span>' + (opts.label || "Вопрос") + ' ' + (i + 1) + ' из ' + items.length + '</span><span>Верно: ' + right + '</span></div>' +
         '<div class="progress"><i style="width:' + (i / items.length * 100) + '%"></i></div>' +
-        '<div class="q-card"><p class="q">' + esc(it.q) + '</p></div>' +
+        '<div class="q-card' + (qk ? " has-say" : "") + '"><p class="q">' + esc(it.q) + '</p>' + (qk ? sayBtn(qk, "corner") : "") + '</div>' +
         '<div class="options">' + order.map(function (idx) {
-          return '<button class="opt" data-i="' + idx + '">' + esc(it.options[idx]) + '</button>';
+          var o = it.options[idx];
+          return '<button class="opt" data-i="' + idx + '"><span class="opt-t">' + esc(o) + '</span>' + (kf[idx] ? optSay(o) : "") + '</button>';
         }).join("") + '</div><div id="fb"></div>';
       view.querySelectorAll(".opt").forEach(function (b) {
         b.onclick = function () {
@@ -588,11 +663,15 @@
             if (xi === it.a) x.classList.add("right");
             else if (xi === chosen) x.classList.add("wrong");
           });
+          var correct = it.options[it.a];
+          var heard = filledSentence(it.q, correct) || (kf[it.a] ? correct : qk);
           document.getElementById("fb").innerHTML =
-            '<div class="explain ' + (ok ? "ok" : "bad") + '"><b>' + (ok ? "Верно" : "Правильно: " + esc(it.options[it.a])) + '</b>' + esc(it.why || "") + '</div>' +
+            '<div class="explain ' + (ok ? "ok" : "bad") + '"><b>' + (ok ? "Верно" : "Правильно: " + esc(correct)) + '</b>' + esc(it.why || "") +
+            (heard ? '<button class="listen" data-say="' + esc(heard) + '">' + SPEAKER + '<span class="kum">' + esc(heard) + '</span></button>' : '') + '</div>' +
             '<div style="height:12px"></div><button class="btn block" id="nx">' + (i + 1 < items.length ? "Следующий вопрос" : "Посмотреть результат") + '</button>';
           document.getElementById("nx").onclick = function () { i++; draw(); };
           document.getElementById("nx").focus();
+          if (heard && store.settings.autoCards) say(heard, { quiet: true });
         };
       });
     }
@@ -669,6 +748,7 @@
       q: reverse ? "Как по-кумыкски «" + w[1] + "»?" : "Что значит «" + w[0] + "»?",
       options: opts.map(function (x) { return reverse ? x[0] : x[1]; }),
       a: 0,
+      kum: !!reverse,
       why: w[0] + " — " + w[1] + "."
     };
   }
@@ -866,7 +946,7 @@
       '<h2>Озвучка</h2>' +
       '<div class="settings">' +
         '<button class="switch wide" id="setTts" aria-pressed="' + store.settings.tts + '"><span>Синтез речи для слов без записи</span><i></i></button>' +
-        '<button class="switch wide" id="setAuto" aria-pressed="' + store.settings.autoCards + '"><span>Произносить слово на флешкарточке сразу</span><i></i></button>' +
+        '<button class="switch wide" id="setAuto" aria-pressed="' + store.settings.autoCards + '"><span>Произносить сразу: слово на карточке и правильный ответ в упражнениях</span><i></i></button>' +
         '<button class="btn soft block" id="testVoice">' + SPEAKER + ' Проверить: «Ассаламу алайкум»</button>' +
         '<p class="small muted" id="voiceInfo">' + voiceInfo() + '</p>' +
       '</div>' +

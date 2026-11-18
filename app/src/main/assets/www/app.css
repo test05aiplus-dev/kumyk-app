@@ -293,14 +293,29 @@ p { margin: 0 0 10px; }
 
 /* ---------- диалоги ---------- */
 .dialog { background: var(--paper); border: 1px solid var(--line); border-radius: var(--r-lg); padding: 16px; margin-bottom: 14px; }
-.dialog h3 { font-family: var(--serif); font-size: 19px; display: flex; justify-content: space-between; align-items: center; }
+.dialog h3 { font-family: var(--serif); font-size: 19px; margin: 0; }
+.dialog-head { display: flex; justify-content: space-between; align-items: center; gap: 10px; margin-bottom: 4px; }
+.proverbs-head { margin-top: 26px; }
+.proverbs-head h2 { margin: 0; }
+.play-btn {
+  flex: none; display: inline-flex; align-items: center; gap: 6px;
+  border: 0; border-radius: 999px; padding: 8px 14px 8px 10px;
+  background: var(--indigo); color: #fff; font-weight: 600; font-size: 14px;
+}
+.play-btn svg { width: 18px; height: 18px; fill: currentColor; }
+.play-btn.on { background: var(--pom); }
+.bubble { transition: box-shadow .2s; }
+.bubble.playing { box-shadow: 0 0 0 3px var(--saffron); }
 .bubble { max-width: 86%; margin: 10px 0; padding: 10px 14px; border-radius: 16px; }
 .bubble.a { background: #E7EAF6; border-bottom-left-radius: 4px; }
 .bubble.b { background: var(--indigo); color: #fff; margin-left: auto; border-bottom-right-radius: 4px; }
 .bubble .kum { font-size: 17px; display: block; }
 .bubble .ru { font-size: 14px; opacity: .75; display: block; margin-top: 2px; }
 .hide-ru .bubble .ru, .hide-ru .proverb .ru { display: none; }
-.proverb { padding: 14px 0; border-bottom: 1px solid var(--line); }
+.proverb { display: flex; align-items: flex-start; gap: 12px; padding: 14px 6px; border-bottom: 1px solid var(--line); border-radius: var(--r-sm); transition: background .2s; }
+.proverb .ptext { flex: 1; }
+.proverb .say { margin-top: 2px; }
+.proverb.playing { background: #FCEFCF; }
 .proverb .kum { font-size: 19px; font-style: italic; display: block; }
 .proverb .ru { color: var(--muted); }
 

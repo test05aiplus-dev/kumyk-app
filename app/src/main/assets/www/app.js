@@ -159,11 +159,30 @@
     if (nativeTts()) { try { window.KumykNative.stop(); } catch (e) {} }
     else if ("speechSynthesis" in window) { try { speechSynthesis.cancel(); } catch (e) {} }
   }
-  function speakTts(text) {
+  var pendingTts = {}, uttSeq = 0;
+  // Android сообщает об окончании фразы через этот вызов
+  window.__ttsDone = function (id) {
+    var cb = pendingTts[id];
+    delete pendingTts[id];
+    if (cb) cb();
+  };
+  function speakTts(text, opts) {
+    opts = opts || {};
     if (!store.settings.tts) return false;
     var clean = audioKey(text);
     if (nativeTts()) {
-      try { window.KumykNative.speak(clean, translit(clean)); return true; } catch (e) { return false; }
+      try {
+        var e = window.KumykNative.engine();
+        if (e !== "tr" && e !== "ru") return false;
+        if (typeof window.KumykNative.speakEx === "function") {
+          var id = "u" + (++uttSeq);
+          if (opts.onend) pendingTts[id] = opts.onend;
+          window.KumykNative.speakEx(clean, translit(clean), opts.pitch || 1, id);
+        } else {
+          window.KumykNative.speak(clean, translit(clean));
+        }
+        return true;
+      } catch (err) { return false; }
     }
     if ("speechSynthesis" in window) {
       var voices = speechSynthesis.getVoices();
@@ -172,21 +191,65 @@
       var u = new SpeechSynthesisUtterance(tr ? translit(clean) : clean);
       if (tr) { u.voice = tr; u.lang = tr.lang; } else if (ru) { u.voice = ru; u.lang = ru.lang; } else { u.lang = "ru-RU"; }
       u.rate = 0.85;
+      u.pitch = opts.pitch || 1;
+      if (opts.onend) { u.onend = opts.onend; u.onerror = opts.onend; }
       speechSynthesis.speak(u);
       return true;
     }
     return false;
   }
-  function say(text) {
+  // Произносит текст. Возвращает true, если звук запущен.
+  function say(text, opts) {
+    opts = opts || {};
     stopSpeech();
     var f = AUDIO[audioKey(text)];
     if (f) {
-      player = new Audio("audio/" + encodeURIComponent(f));
-      var p = player.play();
-      if (p && p.catch) p.catch(function () { speakTts(text); });
-      return;
+      var pl = player = new Audio("audio/" + encodeURIComponent(f));
+      pl.onended = function () { if (opts.onend) opts.onend(); };
+      var pr = pl.play();
+      if (pr && pr.catch) pr.catch(function () {
+        if (!speakTts(text, opts) && opts.onend) opts.onend();
+      });
+      return true;
     }
-    if (!speakTts(text) && !store.settings.tts) toast("Синтез речи выключен в профиле");
+    if (speakTts(text, opts)) return true;
+    if (!store.settings.tts && !opts.quiet) toast("Синтез речи выключен в профиле");
+    return false;
+  }
+
+  /* Проигрывание подряд: диалог целиком или все пословицы */
+  var seq = null;
+  function stopSeq() {
+    if (!seq) return;
+    var s0 = seq; seq = null;
+    clearTimeout(s0.watch); clearTimeout(s0.gap);
+    if (s0.hooks.end) s0.hooks.end(false);
+  }
+  function playSeq(items, hooks) {
+    stopSeq();
+    stopSpeech();
+    var me = seq = { hooks: hooks || {}, watch: 0, gap: 0 };
+    var i = 0;
+    function next() {
+      if (seq !== me) return;
+      if (i >= items.length) { seq = null; if (me.hooks.end) me.hooks.end(true); return; }
+      var it = items[i++];
+      if (me.hooks.step) me.hooks.step(it);
+      var done = false;
+      function fin() {
+        if (done || seq !== me) return;
+        done = true;
+        clearTimeout(me.watch);
+        me.gap = setTimeout(next, 450);
+      }
+      // страховка, если движок речи не сообщит об окончании
+      me.watch = setTimeout(fin, Math.max(3000, it.text.length * 170) + 1500);
+      if (!say(it.text, { pitch: it.pitch, onend: fin, quiet: true })) {
+        clearTimeout(me.watch);
+        me.watch = setTimeout(fin, 1200);
+      }
+    }
+    next();
   }
   function canSay(text) { return !!AUDIO[audioKey(text)] || store.settings.tts; }
   var SPEAKER = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9h4l5-4v14l-5-4H4z"/><path d="M16.5 8.5a5 5 0 010 7M19 6a8.5 8.5 0 010 12"/></svg>';
@@ -197,8 +260,9 @@
   document.addEventListener("click", function (e) {
     var el = e.target.closest ? e.target.closest("[data-say]") : null;
     if (!el) return;
+    stopSeq();
     if (el.classList.contains("say")) { e.stopPropagation(); e.preventDefault(); }
-    say(el.getAttribute("data-say"));
+    say(el.getAttribute("data-say"), { pitch: parseFloat(el.getAttribute("data-pitch")) || 1 });
   }, true);
 
   function setScreen(title, back, tab) {
@@ -217,6 +281,7 @@
   /* ================= маршрутизация ================= */
   function route() {
     clearTimers();
+    stopSeq();
     stopSpeech();
     var h = location.hash.replace(/^#\/?/, "").split("/");
     var r = h[0] || "home";
@@ -703,25 +768,68 @@
   }
 
   /* ================= диалоги и пословицы ================= */
+  var PLAY = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5v14l11-7z"/></svg>';
+  var STOP = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 7h10v10H7z"/></svg>';
   function dialogs() {
     setScreen("Диалоги и пословицы", "#/home", "home");
     var hideRu = false;
     function draw() {
+      stopSeq();
       view.innerHTML =
-        '<p class="muted small">Нажмите на реплику, чтобы её услышать.</p>' +
+        '<p class="muted small">Нажмите «Слушать», чтобы прослушать диалог целиком, или на реплику, чтобы услышать только её.</p>' +
         '<div class="vocab-tools"><span class="muted small">' + window.DIALOGS.length + ' ' + plural(window.DIALOGS.length, "диалог", "диалога", "диалогов") + '</span>' +
         '<button class="switch" id="sw" aria-pressed="' + hideRu + '"><i></i>Без перевода</button></div>' +
         '<div class="' + (hideRu ? "hide-ru" : "") + '">' +
-        window.DIALOGS.map(function (d) {
-          return '<section class="dialog"><h3>' + esc(d.title) + '</h3>' + d.lines.map(function (ln) {
-            return '<div class="bubble ' + (ln[0] === "А" ? "a" : "b") + '" data-say="' + esc(ln[1]) + '" role="button" tabindex="0"><span class="kum">' + esc(ln[1]) + '</span><span class="ru">' + esc(ln[2]) + '</span></div>';
-          }).join("") + '</section>';
+        window.DIALOGS.map(function (d, di) {
+          return '<section class="dialog"><div class="dialog-head"><h3>' + esc(d.title) + '</h3>' +
+            '<button class="play-btn" data-dialog="' + di + '">' + PLAY + '<span>Слушать</span></button></div>' +
+            d.lines.map(function (ln, li) {
+              return '<div class="bubble ' + (ln[0] === "А" ? "a" : "b") + '" id="b' + di + '_' + li + '" data-say="' + esc(ln[1]) + '" data-pitch="' + (ln[0] === "А" ? 1.1 : 0.82) + '" role="button" tabindex="0">' +
+                '<span class="kum">' + esc(ln[1]) + '</span><span class="ru">' + esc(ln[2]) + '</span></div>';
+            }).join("") + '</section>';
         }).join("") +
-        '<h2>Пословицы</h2>' +
-        window.PROVERBS.map(function (p) {
-          return '<div class="proverb" data-say="' + esc(p[0]) + '" role="button" tabindex="0"><span class="kum">' + esc(p[0]) + '</span><span class="ru">' + esc(p[1]) + '</span></div>';
+        '<div class="dialog-head proverbs-head"><h2>Пословицы</h2>' +
+        '<button class="play-btn" id="playProv">' + PLAY + '<span>Слушать все</span></button></div>' +
+        window.PROVERBS.map(function (p, pi) {
+          return '<div class="proverb" id="p' + pi + '">' + sayBtn(p[0]) +
+            '<span class="ptext" data-say="' + esc(p[0]) + '" role="button" tabindex="0"><span class="kum">' + esc(p[0]) + '</span><span class="ru">' + esc(p[1]) + '</span></span></div>';
         }).join("") + '</div>';
+
       document.getElementById("sw").onclick = function () { hideRu = !hideRu; draw(); };
+
+      function bindPlay(btn, items, label) {
+        btn.onclick = function () {
+          if (btn.classList.contains("on")) { stopSeq(); stopSpeech(); return; }
+          view.querySelectorAll(".playing").forEach(function (x) { x.classList.remove("playing"); });
+          btn.classList.add("on");
+          btn.innerHTML = STOP + "<span>Стоп</span>";
+          playSeq(items, {
+            step: function (it) {
+              view.querySelectorAll(".playing").forEach(function (x) { x.classList.remove("playing"); });
+              var el = document.getElementById(it.el);
+              if (el) {
+                el.classList.add("playing");
+                if (el.scrollIntoView) el.scrollIntoView({ block: "nearest", behavior: "smooth" });
+              }
+            },
+            end: function () {
+              view.querySelectorAll(".playing").forEach(function (x) { x.classList.remove("playing"); });
+              btn.classList.remove("on");
+              btn.innerHTML = PLAY + "<span>" + label + "</span>";
+            }
+          });
+        };
+      }
+      view.querySelectorAll("[data-dialog]").forEach(function (btn) {
+        var di = +btn.getAttribute("data-dialog");
+        // у собеседников разная высота голоса, чтобы их было легко различить
+        bindPlay(btn, window.DIALOGS[di].lines.map(function (ln, li) {
+          return { text: ln[1], pitch: ln[0] === "А" ? 1.1 : 0.82, el: "b" + di + "_" + li };
+        }), "Слушать");
+      });
+      bindPlay(document.getElementById("playProv"), window.PROVERBS.map(function (p, pi) {
+        return { text: p[0], pitch: 1, el: "p" + pi };
+      }), "Слушать все");
     }
     draw();
   }

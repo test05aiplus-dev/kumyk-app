@@ -10,6 +10,7 @@ import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
 import android.speech.tts.TextToSpeech;
+import android.speech.tts.UtteranceProgressListener;
 import android.view.Gravity;
 import android.view.View;
 import android.view.ViewGroup;
@@ -24,6 +25,8 @@ import android.webkit.WebViewClient;
 import android.widget.FrameLayout;
 
 import androidx.webkit.WebViewAssetLoader;
+
+import org.json.JSONObject;
 
 import java.util.Locale;
 
@@ -133,6 +136,36 @@ public class MainActivity extends Activity {
                 ttsLang = "none";
             }
             tts.setSpeechRate(0.85f);
+            tts.setOnUtteranceProgressListener(new UtteranceProgressListener() {
+                @Override
+                public void onStart(String utteranceId) {
+                }
+
+                @Override
+                public void onDone(String utteranceId) {
+                    notifyDone(utteranceId);
+                }
+
+                @Override
+                @SuppressWarnings("deprecation")
+                public void onError(String utteranceId) {
+                    notifyDone(utteranceId);
+                }
+
+                @Override
+                public void onError(String utteranceId, int errorCode) {
+                    notifyDone(utteranceId);
+                }
+            });
+        });
+    }
+
+    /** Сообщаем странице, что фраза договорена — нужно для проигрывания диалога подряд. */
+    private void notifyDone(String utteranceId) {
+        if (utteranceId == null) return;
+        final String js = "window.__ttsDone && window.__ttsDone(" + JSONObject.quote(utteranceId) + ")";
+        runOnUiThread(() -> {
+            if (web != null) web.evaluateJavascript(js, null);
         });
     }
 
@@ -145,14 +178,25 @@ public class MainActivity extends Activity {
         /** cyrillic — исходный текст, latin — транскрипция для турецкого голоса. */
         @JavascriptInterface
         public void speak(String cyrillic, String latin) {
+            speakEx(cyrillic, latin, 1f, "kumyk");
+        }
+
+        /** То же с высотой голоса (разные собеседники) и id для сигнала об окончании. */
+        @JavascriptInterface
+        public void speakEx(String cyrillic, String latin, float pitch, String id) {
             TextToSpeech t = tts;
             if (t == null) return;
             String lang = ttsLang;
+            String text;
             if ("tr".equals(lang)) {
-                t.speak(latin, TextToSpeech.QUEUE_FLUSH, null, "kumyk");
+                text = latin;
             } else if ("ru".equals(lang)) {
-                t.speak(cyrillic, TextToSpeech.QUEUE_FLUSH, null, "kumyk");
+                text = cyrillic;
+            } else {
+                return;
             }
+            t.setPitch(Math.max(0.5f, Math.min(2f, pitch)));
+            t.speak(text, TextToSpeech.QUEUE_FLUSH, null, id);
         }
 
         @JavascriptInterface

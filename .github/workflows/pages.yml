@@ -27,7 +27,8 @@ jobs:
         uses: actions/configure-pages@v5
       - name: Подсказка
         if: steps.pages.outcome != 'success'
-        run: echo "::notice::GitHub Pages ещё не включён. Settings → Pages → Source: GitHub Actions (для бесплатного аккаунта репозиторий должен быть публичным)."
+        run: |
+          echo "::notice::GitHub Pages ещё не включён. Откройте Settings → Pages и выберите Source = GitHub Actions. На бесплатном аккаунте репозиторий должен быть публичным."
       - name: Сборка сайта
         run: bash .github/scripts/build-web.sh
       - uses: actions/upload-pages-artifact@v3

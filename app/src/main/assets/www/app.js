@@ -486,7 +486,7 @@
           '<button class="nav-btn" id="prev"' + (history.length ? '' : ' disabled') + '>' + CHEV_L + '<span>Назад</span></button>' +
           '<button class="nav-btn" id="skip"><span>Дальше</span>' + CHEV_R + '</button>' +
         '</div>' +
-        '<button class="skip-all" id="skipAll">Пропустить всё и перейти к спринту</button>';
+        '<button class="skip-all" id="skipAll">Пропустить всё</button>';
       var f = document.getElementById("flash");
       if (store.settings.autoCards && canSay(w[0])) timers.push(setTimeout(function () { say(w[0]); }, 250));
       function flip() { f.classList.toggle("flipped"); }

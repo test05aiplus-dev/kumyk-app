@@ -9,11 +9,13 @@ import android.graphics.Insets;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
+import android.speech.tts.TextToSpeech;
 import android.view.Gravity;
 import android.view.View;
 import android.view.ViewGroup;
 import android.view.WindowInsets;
 import android.view.WindowInsetsController;
+import android.webkit.JavascriptInterface;
 import android.webkit.WebResourceRequest;
 import android.webkit.WebResourceResponse;
 import android.webkit.WebSettings;
@@ -22,6 +24,8 @@ import android.webkit.WebViewClient;
 import android.widget.FrameLayout;
 
 import androidx.webkit.WebViewAssetLoader;
+
+import java.util.Locale;
 
 /**
  * Оболочка приложения: показывает офлайн-интерфейс из assets/www
@@ -36,6 +40,9 @@ public class MainActivity extends Activity {
 
     private WebView web;
     private View statusBg;
+    private TextToSpeech tts;
+    /** "loading", "tr", "ru" или "none" — какой голос сейчас доступен. */
+    private volatile String ttsLang = "loading";
 
     @SuppressLint("SetJavaScriptEnabled")
     @Override
@@ -68,6 +75,10 @@ public class MainActivity extends Activity {
         s.setMediaPlaybackRequiresUserGesture(false);
         s.setSupportZoom(false);
 
+        initTts();
+        // Мост для озвучки: страница вызывает KumykNative.speak(...)
+        web.addJavascriptInterface(new SpeechBridge(), "KumykNative");
+
         final WebViewAssetLoader loader = new WebViewAssetLoader.Builder()
                 .setDomain(HOST)
                 .addPathHandler("/assets/", new WebViewAssetLoader.AssetsPathHandler(this))
@@ -96,6 +107,58 @@ public class MainActivity extends Activity {
             web.restoreState(savedInstanceState);
         } else {
             web.loadUrl(START_URL);
+        }
+    }
+
+    /**
+     * Синтез речи. Кумыкского голоса нет ни в одном движке, поэтому берём
+     * турецкий (близкая фонетика, текст передаётся в латинской транскрипции),
+     * а если его нет — русский (читает кириллицу как есть).
+     */
+    private void initTts() {
+        tts = new TextToSpeech(getApplicationContext(), status -> {
+            if (status != TextToSpeech.SUCCESS || tts == null) {
+                ttsLang = "none";
+                return;
+            }
+            Locale tr = Locale.forLanguageTag("tr-TR");
+            Locale ru = Locale.forLanguageTag("ru-RU");
+            if (tts.isLanguageAvailable(tr) >= TextToSpeech.LANG_AVAILABLE
+                    && tts.setLanguage(tr) >= TextToSpeech.LANG_AVAILABLE) {
+                ttsLang = "tr";
+            } else if (tts.isLanguageAvailable(ru) >= TextToSpeech.LANG_AVAILABLE
+                    && tts.setLanguage(ru) >= TextToSpeech.LANG_AVAILABLE) {
+                ttsLang = "ru";
+            } else {
+                ttsLang = "none";
+            }
+            tts.setSpeechRate(0.85f);
+        });
+    }
+
+    private class SpeechBridge {
+        @JavascriptInterface
+        public String engine() {
+            return ttsLang;
+        }
+
+        /** cyrillic — исходный текст, latin — транскрипция для турецкого голоса. */
+        @JavascriptInterface
+        public void speak(String cyrillic, String latin) {
+            TextToSpeech t = tts;
+            if (t == null) return;
+            String lang = ttsLang;
+            if ("tr".equals(lang)) {
+                t.speak(latin, TextToSpeech.QUEUE_FLUSH, null, "kumyk");
+            } else if ("ru".equals(lang)) {
+                t.speak(cyrillic, TextToSpeech.QUEUE_FLUSH, null, "kumyk");
+            }
+        }
+
+        @JavascriptInterface
+        public void stop() {
+            TextToSpeech t = tts;
+            if (t != null) t.stop();
         }
     }
 
@@ -170,6 +233,10 @@ public class MainActivity extends Activity {
 
     @Override
     protected void onDestroy() {
+        if (tts != null) {
+            tts.shutdown();
+            tts = null;
+        }
         if (web != null) {
             web.destroy();
             web = null;

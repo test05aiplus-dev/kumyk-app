@@ -190,8 +190,9 @@ p { margin: 0 0 10px; }
 .switch[aria-pressed="true"] i { background: var(--indigo); }
 .switch[aria-pressed="true"] i::after { transform: translateX(16px); }
 .wordlist { background: var(--paper); border-radius: var(--r-md); border: 1px solid var(--line); overflow: hidden; }
-.wordlist button { display: flex; width: 100%; justify-content: space-between; align-items: baseline; gap: 12px; text-align: left; background: none; border: 0; border-bottom: 1px solid var(--line); padding: 13px 14px; }
-.wordlist button:last-child { border-bottom: 0; }
+.vrow { display: flex; align-items: center; border-bottom: 1px solid var(--line); padding-left: 8px; }
+.vrow:last-child { border-bottom: 0; }
+.vword { flex: 1; display: flex; justify-content: space-between; align-items: baseline; gap: 12px; text-align: left; background: none; border: 0; padding: 13px 14px 13px 6px; }
 .wordlist .kum { font-size: 18px; font-weight: 600; color: var(--indigo); }
 .wordlist .ru { color: var(--muted); text-align: right; }
 .wordlist .ru.hide { color: transparent; background: var(--snow); border-radius: 4px; min-width: 70px; }
@@ -282,7 +283,8 @@ p { margin: 0 0 10px; }
 .dict-meta { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; font-size: 14px; color: var(--muted); }
 .chip { border: 1.5px solid var(--line); background: var(--paper); border-radius: 999px; padding: 6px 12px; font-size: 14px; color: var(--muted); }
 .chip.on { border-color: var(--indigo); color: var(--indigo); font-weight: 600; }
-.dict-list .item { display: flex; justify-content: space-between; gap: 12px; padding: 12px 14px; border-bottom: 1px solid var(--line); }
+.dict-list .item { display: flex; align-items: center; gap: 6px; padding: 8px 14px 8px 8px; border-bottom: 1px solid var(--line); }
+.dmain { flex: 1; display: flex; justify-content: space-between; align-items: baseline; gap: 12px; padding: 4px 0; }
 .dict-list .item .kum { font-size: 18px; font-weight: 600; color: var(--indigo); }
 .dict-list .item .ru { color: var(--ink); text-align: right; }
 .dict-list .item .tag { display: block; font-size: 12px; color: var(--moss); }
@@ -312,6 +314,29 @@ p { margin: 0 0 10px; }
 .stats b { display: block; font: 600 28px/1.1 var(--serif); color: var(--indigo); }
 .stats span { font-size: 14px; color: var(--muted); }
 .note { font-size: 14px; color: var(--muted); background: #E7EAF6; border-radius: var(--r-md); padding: 12px 14px; margin-top: 18px; }
+
+/* ---------- озвучка ---------- */
+.say {
+  flex: none; width: 40px; height: 40px; border-radius: 50%;
+  display: inline-grid; place-items: center;
+  border: 0; background: #E7EAF6; color: var(--indigo);
+}
+.say svg { width: 21px; height: 21px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.say svg path:first-child { fill: currentColor; }
+.say:active { background: var(--saffron); color: var(--ink); }
+.say.light { background: rgba(255,255,255,.16); color: #fff; width: 48px; height: 48px; }
+.say.light svg { width: 24px; height: 24px; }
+.say.corner { position: absolute; top: 24px; right: 14px; }
+.word-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.ex-say { cursor: pointer; text-decoration: underline dotted rgba(34,48,107,.35); text-underline-offset: 4px; }
+.bubble, .proverb { cursor: pointer; }
+.bubble:active { filter: brightness(.94); }
+.settings { margin-bottom: 18px; }
+.settings .btn { margin: 8px 0 6px; }
+.settings .btn svg { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; }
+.settings .btn svg path:first-child { fill: currentColor; }
+.switch.wide { width: 100%; justify-content: space-between; text-align: left; font-size: 15.5px; color: var(--ink); padding: 12px 0; border-bottom: 1px solid var(--line); }
+.switch.wide i { flex: none; }
 
 /* ---------- тост ---------- */
 .toast {

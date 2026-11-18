@@ -445,25 +445,27 @@
     s.due = Date.now() + BOX_DAYS[s.box] * 86400000;
     store.srs[k] = s; save();
   }
-  function cards(l) {
+  function cards(l, onlyWords) {
     setScreen("Флешкарточки", "#/lesson/" + l.id, "lessons");
     var now = Date.now();
     var due = l.words.filter(function (w) { return srsGet(w[0]).due <= now; });
-    var deck = shuffle(due.length ? due : l.words);
-    var reviewAll = !due.length;
-    var i = 0, known = 0, skipped = 0, total = deck.length;
-    var history = []; // для кнопки «Назад»: состояние до каждого шага
+    var reviewAll = !onlyWords && !due.length;
+    var deck = shuffle(onlyWords || (due.length ? due : l.words));
+    var i = 0, known = 0, total = deck.length;
+    var status = {};   // слово → "yes" | "no" | "skip" (последняя отметка)
+    var history = [];  // для кнопки «Назад»: состояние до каждого шага
 
     function snapshot(w) {
       var prev = store.srs[w[0]];
-      history.push({ i: i, known: known, skipped: skipped, deckLen: deck.length, key: w[0],
+      history.push({ i: i, known: known, deckLen: deck.length, key: w[0], status: status[w[0]],
                      srs: prev ? { box: prev.box, due: prev.due } : null, xp: store.xp });
     }
     function back() {
       var h = history.pop();
       if (!h) return;
-      i = h.i; known = h.known; skipped = h.skipped;
+      i = h.i; known = h.known;
       deck.length = h.deckLen;
+      if (h.status === undefined) delete status[h.key]; else status[h.key] = h.status;
       if (h.srs) store.srs[h.key] = h.srs; else delete store.srs[h.key];
       store.xp = h.xp;
       save();
@@ -471,7 +473,7 @@
     }
 
     function draw() {
-      if (i >= deck.length) return done();
+      if (i >= deck.length) return done(false);
       var w = deck[i];
       view.innerHTML =
         (reviewAll && i === 0 ? '<p class="small muted">Все слова урока уже повторены вовремя. Можно пройтись ещё раз.</p>' : '') +
@@ -492,22 +494,56 @@
       function flip() { f.classList.toggle("flipped"); }
       f.onclick = flip;
       f.onkeydown = function (e) { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); flip(); } };
-      document.getElementById("yes").onclick = function () { snapshot(w); srsAnswer(w[0], true); known++; addXp(2); i++; draw(); };
-      document.getElementById("no").onclick = function () { snapshot(w); srsAnswer(w[0], false); deck.push(w); i++; draw(); };
+      document.getElementById("yes").onclick = function () { snapshot(w); srsAnswer(w[0], true); status[w[0]] = "yes"; known++; addXp(2); i++; draw(); };
+      document.getElementById("no").onclick = function () { snapshot(w); srsAnswer(w[0], false); status[w[0]] = "no"; deck.push(w); i++; draw(); };
       // «Дальше» — пропустить слово без оценки, интервалы повторения не меняются
-      document.getElementById("skip").onclick = function () { snapshot(w); skipped++; i++; draw(); };
+      document.getElementById("skip").onclick = function () { snapshot(w); if (!status[w[0]]) status[w[0]] = "skip"; i++; draw(); };
+      // «Пропустить всё» — сразу к итоговой таблице
+      document.getElementById("skipAll").onclick = function () {
+        snapshot(w);
+        for (var j = i; j < deck.length; j++) if (!status[deck[j][0]]) status[deck[j][0]] = "skip";
+        i = deck.length;
+        done(true);
+      };
       document.getElementById("prev").onclick = back;
-      document.getElementById("skipAll").onclick = function () { location.hash = nextStepHref(l, "cards"); };
     }
-    function done() {
-      completeStep(l.id, "cards");
-      view.innerHTML = '<div class="result"><div class="big">' + known + '/' + total + '</div>' +
-        '<p>' + (skipped ? 'Пропущено: ' + skipped + '. ' : '') + 'Слова, которые вы помните, вернутся через 1, 2, 4, 8 дней — так они переходят в долгую память.</p>' +
-        '<div class="stack"><a class="btn block" href="' + nextStepHref(l, "cards") + '">Дальше: Спринт</a>' +
-        (history.length ? '<button class="btn block soft" id="lastBack">Вернуться к последней карточке</button>' : '') +
-        '<a class="btn block soft" href="#/lesson/' + l.id + '">К уроку</a></div></div>';
+
+    function done(skippedAll) {
+      // карточки засчитываются, если хоть одно слово оценено
+      var rated = Object.keys(status).some(function (k) { return status[k] !== "skip"; });
+      if (rated) completeStep(l.id, "cards");
+      var uniq = [], seenW = {};
+      deck.forEach(function (w) { if (!seenW[w[0]]) { seenW[w[0]] = 1; uniq.push(w); } });
+      var order = { no: 0, skip: 1, yes: 2 };
+      uniq.sort(function (a, b) { return order[status[a[0]] || "skip"] - order[status[b[0]] || "skip"]; });
+      var cnt = { yes: 0, no: 0, skip: 0 };
+      uniq.forEach(function (w) { cnt[status[w[0]] || "skip"]++; });
+      var label = { yes: "Помню", no: "Повторить", skip: "Пропущено" };
+      var rows = uniq.map(function (w) {
+        var st = status[w[0]] || "skip";
+        return '<tr class="st-' + st + '"><td>' + sayBtn(w[0]) + '</td><td class="kum">' + esc(w[0]) + '</td><td>' + esc(w[1]) + '</td><td><span class="tag-' + st + '">' + label[st] + '</span></td></tr>';
+      }).join("");
+      var skippedWords = uniq.filter(function (w) { return (status[w[0]] || "skip") === "skip"; });
+
+      view.innerHTML =
+        '<h2>Итоги карточек</h2>' +
+        '<div class="sum-row">' +
+          '<div class="sum yes"><b>' + cnt.yes + '</b><span>помню</span></div>' +
+          '<div class="sum no"><b>' + cnt.no + '</b><span>повторить</span></div>' +
+          '<div class="sum skip"><b>' + cnt.skip + '</b><span>пропущено</span></div>' +
+        '</div>' +
+        '<div class="table-wrap"><table class="res-table"><thead><tr><th></th><th>Слово</th><th>Перевод</th><th>Итог</th></tr></thead><tbody>' + rows + '</tbody></table></div>' +
+        '<p class="small muted">Слова с отметкой «Помню» вернутся через 1, 2, 4, 8 дней, «Повторить» — завтра. Пропущенные слова интервалы не меняют.</p>' +
+        '<div class="stack">' +
+          '<a class="btn block" href="' + nextStepHref(l, "cards") + '">Дальше: Спринт</a>' +
+          (skippedWords.length ? '<button class="btn block accent" id="again">Пройти пропущенные (' + skippedWords.length + ')</button>' : '') +
+          (history.length ? '<button class="btn block soft" id="lastBack">Вернуться к последней карточке</button>' : '') +
+          '<a class="btn block soft" href="#/lesson/' + l.id + '">К уроку</a>' +
+        '</div>';
       var lb = document.getElementById("lastBack");
       if (lb) lb.onclick = back;
+      var ag = document.getElementById("again");
+      if (ag) ag.onclick = function () { cards(l, skippedWords); window.scrollTo(0, 0); };
     }
     draw();
   }

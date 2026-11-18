@@ -223,6 +223,26 @@ p { margin: 0 0 10px; }
 .nav-btn:active { background: #E7EAF6; }
 .nav-btn[disabled] { color: #B4B9CE; }
 .skip-all { display: block; margin: 10px auto 0; min-height: 44px; padding: 0 16px; border: 0; background: none; color: var(--muted); font-size: 14.5px; text-decoration: underline; text-underline-offset: 3px; }
+.sum-row { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-bottom: 14px; }
+.sum { border-radius: var(--r-md); padding: 12px; text-align: center; }
+.sum b { display: block; font: 600 28px/1.1 var(--serif); }
+.sum span { font-size: 13.5px; }
+.sum.yes { background: var(--moss-bg); color: #1D5E43; }
+.sum.no { background: var(--pom-bg); color: #861A2C; }
+.sum.skip { background: #E7EAF6; color: var(--muted); }
+.table-wrap { background: var(--paper); border: 1px solid var(--line); border-radius: var(--r-md); overflow-x: auto; margin-bottom: 12px; }
+.res-table { width: 100%; border-collapse: collapse; font-size: 15px; }
+.res-table th { text-align: left; font-weight: 500; font-size: 13px; color: var(--muted); padding: 10px 8px; border-bottom: 1px solid var(--line); }
+.res-table td { padding: 6px 8px; border-bottom: 1px solid var(--line); vertical-align: middle; }
+.res-table tr:last-child td { border-bottom: 0; }
+.res-table td:first-child { width: 44px; padding-right: 0; }
+.res-table td.kum { font-size: 17px; font-weight: 600; color: var(--indigo); }
+.res-table .say { width: 34px; height: 34px; }
+.res-table .say svg { width: 18px; height: 18px; }
+.tag-yes, .tag-no, .tag-skip { display: inline-block; padding: 3px 8px; border-radius: 999px; font-size: 12.5px; font-weight: 600; white-space: nowrap; }
+.tag-yes { background: var(--moss-bg); color: #1D5E43; }
+.tag-no { background: var(--pom-bg); color: #861A2C; }
+.tag-skip { background: #E7EAF6; color: var(--muted); }
 .progress { height: 6px; background: var(--line); border-radius: 3px; overflow: hidden; margin: 4px 0 14px; }
 .progress i { display: block; height: 100%; background: var(--saffron); transition: width .3s; }
 .counter { font-size: 14px; color: var(--muted); display: flex; justify-content: space-between; }

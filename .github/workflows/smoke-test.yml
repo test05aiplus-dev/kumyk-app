@@ -1,9 +1,8 @@
 name: Проверка запуска
 
+# Запуск на эмуляторах Android — вручную: Actions → «Проверка запуска» → Run workflow
 on:
   workflow_dispatch:
-  push:
-    branches: [ main ]
 
 jobs:
   smoke:

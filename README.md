@@ -31,6 +31,29 @@
 
 Для Google Play: Build → Generate Signed App Bundle, создайте ключ и храните его отдельно от проекта.
 
+## iPhone
+
+Есть два способа, оба используют тот же интерфейс и уроки из `app/src/main/assets/www`.
+
+### Сайт на экран «Домой» (без аккаунта Apple)
+1. Репозиторий → Settings → General → внизу «Change visibility» → Public
+   (на бесплатном аккаунте GitHub Pages работает только с публичными репозиториями).
+2. Settings → Pages → Source: **GitHub Actions**.
+3. Actions → «Сайт для iPhone (экран «Домой»)» → Run workflow. Адрес сайта появится
+   в Settings → Pages (вида `https://<аккаунт>.github.io/kumyk-app/`).
+4. На iPhone откройте адрес в Safari → «Поделиться» → «На экран Домой».
+   Приложение работает без интернета; озвучка — встроенным турецким голосом iOS.
+
+### Нативное приложение (App Store / TestFlight)
+Папка `ios/`: Swift-оболочка с WKWebView и озвучкой через AVSpeechSynthesizer.
+GitHub собирает её на Mac (workflow «Сборка iOS»): в артефакте `KumykTil-ios` лежат
+неподписанный `KumykTil-unsigned.ipa` и проект Xcode.
+- **App Store / TestFlight:** нужен аккаунт Apple Developer ($99/год). На Mac:
+  `brew install xcodegen && cd ios && xcodegen generate && open KumykTil.xcodeproj`,
+  выбрать свою команду в Signing & Capabilities, Product → Archive → Distribute.
+- **Без аккаунта, для себя:** установить `KumykTil-unsigned.ipa` через Sideloadly
+  или AltStore со своим Apple ID (нужен компьютер; подпись действует 7 дней).
+
 ## Как менять контент
 
 Все уроки, слова, диалоги и пословицы лежат в одном файле:

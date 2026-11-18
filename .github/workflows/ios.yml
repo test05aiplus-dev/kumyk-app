@@ -1,8 +1,12 @@
 name: Сборка iOS
 
+# Сборки на macOS расходуют бесплатные минуты GitHub в 10 раз быстрее,
+# поэтому автоматически запускаемся только при изменениях iOS-части.
+# Чтобы собрать с новыми уроками: Actions → «Сборка iOS» → Run workflow.
 on:
   push:
     branches: [ main ]
+    paths: [ "ios/**", ".github/workflows/ios.yml" ]
   workflow_dispatch:
 
 jobs:

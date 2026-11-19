@@ -14,6 +14,16 @@
 <meta name="apple-mobile-web-app-title" content="Къумукъ тил">
 <meta name="format-detection" content="telephone=no">
 <link rel="stylesheet" href="app.css">
+<script>
+  // Тема до первой отрисовки, чтобы не было белой вспышки
+  (function () {
+    var t = null;
+    try { t = (JSON.parse(localStorage.getItem("kumyk-app-v1") || "{}").settings || {}).theme; } catch (e) {}
+    var sys = false;
+    try { sys = window.KumykNative && window.KumykNative.systemDark ? window.KumykNative.systemDark() : matchMedia("(prefers-color-scheme: dark)").matches; } catch (e) {}
+    document.documentElement.setAttribute("data-theme", t === "dark" || (!t && sys) ? "dark" : "light");
+  })();
+</script>
 </head>
 <body>
 <header class="topbar">

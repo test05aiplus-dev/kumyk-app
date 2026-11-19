@@ -4,6 +4,7 @@ import android.annotation.SuppressLint;
 import android.app.Activity;
 import android.content.ActivityNotFoundException;
 import android.content.Intent;
+import android.content.res.Configuration;
 import android.graphics.Color;
 import android.graphics.Insets;
 import android.net.Uri;
@@ -43,6 +44,7 @@ public class MainActivity extends Activity {
 
     private WebView web;
     private View statusBg;
+    private FrameLayout root;
     private TextToSpeech tts;
     /** "loading", "tr", "ru" или "none" — какой голос сейчас доступен. */
     private volatile String ttsLang = "loading";
@@ -54,7 +56,7 @@ public class MainActivity extends Activity {
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
 
-        FrameLayout root = new FrameLayout(this);
+        root = new FrameLayout(this);
         root.setBackgroundColor(Color.WHITE);
 
         web = new WebView(this);
@@ -174,6 +176,19 @@ public class MainActivity extends Activity {
     }
 
     private class SpeechBridge {
+        /** Включена ли тёмная тема в системе телефона. */
+        @JavascriptInterface
+        public boolean systemDark() {
+            int mode = getResources().getConfiguration().uiMode & Configuration.UI_MODE_NIGHT_MASK;
+            return mode == Configuration.UI_MODE_NIGHT_YES;
+        }
+
+        /** Страница сообщает тему, чтобы подстроить фон и системные панели. */
+        @JavascriptInterface
+        public void setDark(final boolean dark) {
+            runOnUiThread(() -> applyDark(dark));
+        }
+
         @JavascriptInterface
         public String engine() {
             return ttsLang;
@@ -237,6 +252,25 @@ public class MainActivity extends Activity {
         public void stop() {
             TextToSpeech t = tts;
             if (t != null) t.stop();
+        }
+    }
+
+    @SuppressWarnings("deprecation")
+    private void applyDark(boolean dark) {
+        if (root != null) root.setBackgroundColor(dark ? 0xFF191D36 : Color.WHITE);
+        if (web != null) web.setBackgroundColor(dark ? 0xFF0F1226 : 0xFFF4F5FA);
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            WindowInsetsController c = getWindow().getInsetsController();
+            if (c != null) {
+                c.setSystemBarsAppearance(dark ? 0 : WindowInsetsController.APPEARANCE_LIGHT_NAVIGATION_BARS,
+                        WindowInsetsController.APPEARANCE_LIGHT_NAVIGATION_BARS);
+            }
+        } else {
+            View decor = getWindow().getDecorView();
+            int flags = decor.getSystemUiVisibility();
+            if (dark) flags &= ~View.SYSTEM_UI_FLAG_LIGHT_NAVIGATION_BAR;
+            else flags |= View.SYSTEM_UI_FLAG_LIGHT_NAVIGATION_BAR;
+            decor.setSystemUiVisibility(flags);
         }
     }
 

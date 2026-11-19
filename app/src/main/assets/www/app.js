@@ -21,6 +21,26 @@
     } catch (e) {}
     return blank();
   }
+  /* ----- тема оформления ----- */
+  function systemDark() {
+    try { if (window.KumykNative && window.KumykNative.systemDark) return !!window.KumykNative.systemDark(); } catch (e) {}
+    return !!(window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches);
+  }
+  function isDark() {
+    var t = store.settings && store.settings.theme;
+    return t === "dark" ? true : t === "light" ? false : systemDark();
+  }
+  function applyTheme() {
+    var d = isDark();
+    document.documentElement.setAttribute("data-theme", d ? "dark" : "light");
+    try { if (window.KumykNative && window.KumykNative.setDark) window.KumykNative.setDark(d); } catch (e) {}
+  }
+  applyTheme();
+  if (window.matchMedia) {
+    var mq = window.matchMedia("(prefers-color-scheme: dark)");
+    var onSys = function () { if (!store.settings.theme) applyTheme(); };
+    if (mq.addEventListener) mq.addEventListener("change", onSys); else if (mq.addListener) mq.addListener(onSys);
+  }
   function save() {
     try { localStorage.setItem(KEY, JSON.stringify(store)); } catch (e) {}
   }
@@ -1035,7 +1055,7 @@
     }
     el.innerHTML = shown.map(function (w, i) {
       var a = kr ? '<span class="kum">' + hl(w.k, q) + '</span>' : '<span>' + hl(w.r, q) + '</span>';
-      var b = kr ? '<span class="ru">' + esc(w.r) : '<span class="ru kum" style="font-size:17px;color:var(--indigo);font-weight:600">' + esc(w.k);
+      var b = kr ? '<span class="ru">' + esc(w.r) : '<span class="ru kum" style="font-size:17px;color:var(--indigo-ink);font-weight:600">' + esc(w.k);
       b += (w.lesson ? '<span class="tag">урок ' + w.lesson + '</span>' : '') + '</span>';
       return '<div class="item" id="dw' + i + '">' + sayBtn(w.k, "", w.r) + '<span class="dmain">' + a + b + '</span></div>';
     }).join("");
@@ -1792,6 +1812,11 @@
         (hasPremium() ? '<button class="btn block ghost" id="premReset">Отключить премиум (для теста)</button>'
                       : '<a class="btn block accent" id="openPrem" href="#/premium/profile">Открыть премиум</a>') +
       '</div></section>' +
+      '<h2>Оформление</h2>' +
+      '<div class="settings">' +
+        '<button class="switch wide" id="setDark" aria-pressed="' + isDark() + '"><span>Тёмная тема</span><i></i></button>' +
+        '<p class="small muted" id="themeInfo">' + (store.settings.theme ? "Выбрано вручную." : "Сейчас как в системе телефона.") + '</p>' +
+      '</div>' +
       '<h2>Озвучка</h2>' +
       '<div class="settings">' +
         '<button class="switch wide" id="setTts" aria-pressed="' + store.settings.tts + '"><span>Синтез речи для слов без записи</span><i></i></button>' +
@@ -1810,6 +1835,12 @@
     document.getElementById("setTts").onclick = function () {
       store.settings.tts = !store.settings.tts; save(); this.setAttribute("aria-pressed", store.settings.tts);
       document.getElementById("voiceInfo").textContent = voiceInfo();
+    };
+    document.getElementById("setDark").onclick = function () {
+      store.settings.theme = isDark() ? "light" : "dark";
+      save(); applyTheme();
+      this.setAttribute("aria-pressed", isDark());
+      document.getElementById("themeInfo").textContent = "Выбрано вручную.";
     };
     document.getElementById("setRu").onclick = function () {
       store.settings.sayRu = !store.settings.sayRu; save(); this.setAttribute("aria-pressed", store.settings.sayRu);

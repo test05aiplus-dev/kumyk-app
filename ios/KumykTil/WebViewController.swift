@@ -22,6 +22,7 @@ final class WebViewController: UIViewController, WKScriptMessageHandler, WKNavig
           speak: function (c, l) { window.webkit.messageHandlers.kumyk.postMessage({cmd: "speak", c: String(c), l: String(l), p: 1, id: ""}); },
           speakEx: function (c, l, p, id) { window.webkit.messageHandlers.kumyk.postMessage({cmd: "speak", c: String(c), l: String(l), p: Number(p) || 1, id: String(id)}); },
           stop: function () { window.webkit.messageHandlers.kumyk.postMessage({cmd: "stop"}); },
+          setDark: function (d) { window.webkit.messageHandlers.kumyk.postMessage({cmd: "dark", d: !!d}); },
           hasLang: function (tag) { return String(tag).indexOf("ru") === 0 ? \(speaker.hasLang("ru-RU")) : false; },
           speakLang: function (t, lang, p, id) { window.webkit.messageHandlers.kumyk.postMessage({cmd: "speakLang", t: String(t), lang: String(lang), p: Number(p) || 1, id: String(id)}); }
         };
@@ -70,6 +71,11 @@ final class WebViewController: UIViewController, WKScriptMessageHandler, WKNavig
                                         latin: body["l"] as? String ?? "",
                                         pitch: pitch, id: id)
             if !started && !id.isEmpty { speaker.onDone?(id) }
+        case "dark":
+            let dark = (body["d"] as? Bool) ?? false
+            webView.backgroundColor = dark
+                ? UIColor(red: 0x0F / 255, green: 0x12 / 255, blue: 0x26 / 255, alpha: 1)
+                : UIColor(red: 0xF4 / 255, green: 0xF5 / 255, blue: 0xFA / 255, alpha: 1)
         case "speakLang":
             let id = body["id"] as? String ?? ""
             let pitch = (body["p"] as? NSNumber)?.floatValue ?? 1

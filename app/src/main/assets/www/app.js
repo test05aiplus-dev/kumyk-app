@@ -87,6 +87,55 @@
   window.EXTRA_DICT.forEach(function (w) { if (!seen[w[0]]) { DICT.push({ k: w[0], r: w[1], lesson: 0 }); seen[w[0]] = 1; } });
   DICT.sort(function (a, b) { return a.k.localeCompare(b.k, "ru"); });
 
+  /* ----- слова из 2 и 3 букв (по кумыкскому алфавиту: къ, гъ, гь, нг, оь, уь — одна буква) ----- */
+  var KUM_ABC = ["а","б","в","г","гъ","гь","д","е","ё","ж","з","и","й","к","къ","л","м","н","нг","о","оь","п",
+                 "р","с","т","у","уь","ф","х","ц","ч","ш","щ","ъ","ы","ь","э","ю","я"];
+  var DIGRAPHS = ["гъ", "гь", "къ", "нг", "оь", "уь"];
+  function kumLetters(w) {
+    var out = [];
+    for (var i = 0; i < w.length; i++) {
+      var two = w.substr(i, 2);
+      if (DIGRAPHS.indexOf(two) >= 0) { out.push(two); i++; } else out.push(w.charAt(i));
+    }
+    return out;
+  }
+  function kumCompare(a, b) {
+    var la = kumLetters(a), lb = kumLetters(b);
+    for (var i = 0; i < Math.min(la.length, lb.length); i++) {
+      var d = KUM_ABC.indexOf(la[i]) - KUM_ABC.indexOf(lb[i]);
+      if (d) return d;
+    }
+    return la.length - lb.length;
+  }
+  (function buildLetterSections() {
+    var words = {}, order = [];
+    function add(k, r) {
+      k = String(k).toLowerCase().replace(/[?!.,«»]/g, "").trim();
+      if (!k || /[\s\-]/.test(k) || !/^[а-яё]+$/.test(k)) return;
+      if (!words[k]) { words[k] = []; order.push(k); }
+      String(r).split(/;\s*/).forEach(function (part) { if (words[k].indexOf(part) < 0) words[k].push(part); });
+    }
+    LESSONS.forEach(function (l) { l.words.forEach(function (w) { add(w[0], w[1]); }); });
+    window.EXTRA_DICT.forEach(function (w) { add(w[0], w[1]); });
+    (window.PREMIUM_SECTIONS || []).forEach(function (sec) {
+      sec.items.forEach(function (it) {
+        if (sec.type === "pairs") { add(it[0], it[2]); add(it[1], it[3]); }
+        else if (sec.type === "entries") add(it[0], it[1]);
+      });
+    });
+    function pick(n) {
+      return order.filter(function (k) { return kumLetters(k).length === n; })
+        .sort(kumCompare)
+        .map(function (k) { return [k, words[k].join("; ")]; });
+    }
+    window.PREMIUM_SECTIONS.push(
+      { id: "two-letters", title: "Слова из двух букв", icon: "✌️", type: "letters", free: 5,
+        desc: "Все двухбуквенные слова из словарей приложения, по алфавиту", items: pick(2) },
+      { id: "three-letters", title: "Слова из трёх букв", icon: "🔺", type: "letters", free: 5,
+        desc: "Все трёхбуквенные слова из словарей приложения, по алфавиту", items: pick(3) }
+    );
+  })();
+
   var STEPS = [
     { key: "theory", title: "Теория", sub: "Правила с примерами" },
     { key: "vocab", title: "Экспресс-словарь", sub: "Новые слова урока" },
@@ -1223,6 +1272,12 @@
         '<div class="ptext"><span class="kum">' + esc(it[0]) + '</span><span class="lit">' + esc(it[1]) + '</span>' +
         '<span class="mean">' + esc(it[2]) + '</span></div></div>';
     }
+    if (sec.type === "letters") {
+      return '<div class="phrase lw" id="' + id + '">' + sayBtn(it[0], "", it[1]) +
+        '<div class="ptext"><span class="kum">' + esc(it[0]) + '</span>' +
+        '<span class="lw-letters" aria-label="Буквы">' + kumLetters(it[0]).map(function (c) { return '<i>' + esc(c) + '</i>'; }).join("") + '</span>' +
+        '<span class="mean">' + esc(it[1]) + '</span></div></div>';
+    }
     if (sec.type === "poets") {
       return '<article class="card-article" id="' + id + '"><h3>' + esc(it.name) + '</h3><p class="small muted">' + esc(it.years) + '</p>' +
         '<p>' + esc(it.bio) + '</p>' +
@@ -1242,14 +1297,22 @@
     var open = hasPremium();
     var free = sec.free || 1;
     var visible = open ? sec.items : sec.items.slice(0, free);
-    var canListen = sec.type === "pairs" || sec.type === "proverbs" || sec.type === "entries";
+    var canListen = sec.type === "pairs" || sec.type === "proverbs" || sec.type === "entries" || sec.type === "letters";
     var listCls = sec.type === "poets" || sec.type === "articles" ? "" : "phrase-list";
     var html = '<p class="muted">' + esc(sec.desc) + '.</p>' +
       '<div class="vocab-tools">' +
         (canListen ? '<button class="play-btn" id="playSec">' + PLAY + '<span>Прослушать ' + (open ? "все" : "бесплатные") + '</span></button>' : '<span></span>') +
         '<span class="small ' + (open ? "prem-on" : "muted") + '">' + (open ? "Премиум открыт" : "Открыто " + free + " из " + sec.items.length) + '</span>' +
       '</div>' +
-      '<div class="' + listCls + '">' + visible.map(function (it, i) { return renderItem(sec, it, i); }).join("") + '</div>';
+      '<div class="' + listCls + '">' + visible.map(function (it, i) {
+        var head = "";
+        if (sec.type === "letters") {
+          var first = kumLetters(it[0])[0];
+          if (i === 0 || kumLetters(visible[i - 1][0])[0] !== first) head = '<div class="lw-head">' + esc(first.toUpperCase()) + '</div>';
+        }
+        return head + renderItem(sec, it, i);
+      }).join("") + '</div>' +
+      (sec.type === "letters" ? '<p class="small muted lw-note">Буквы считаются по кумыкскому алфавиту: къ, гъ, гь, нг, оь, уь — каждая одна буква. Список пополняется сам, когда в словарь добавляются слова.</p>' : '');
     if (!open) {
       var rest = sec.items.length - free;
       html += '<div class="locked-list" aria-hidden="true">' + sec.items.slice(free, free + 3).map(function (it) {
@@ -1257,7 +1320,7 @@
             '</span><span class="mean blur">••••••• ••••• •••••••••</span></div></div>';
         }).join("") + '</div>' +
         '<section class="paywall"><h3>Ещё ' + rest + ' в премиум-доступе</h3>' +
-        '<p>Премиум открывает все разделы сразу: фразеологию, синонимы и антонимы, пословицы, этимологию, стихи и историю.</p>' +
+        '<p>Премиум открывает все разделы сразу: фразеологию, синонимы и антонимы, пословицы, этимологию, стихи, историю и слова из двух и трёх букв.</p>' +
         '<a class="btn block accent" href="#/premium/' + sec.id + '">Открыть премиум</a></section>';
     }
     view.innerHTML = html;

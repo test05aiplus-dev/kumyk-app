@@ -595,3 +595,9 @@ input { -webkit-user-select: text; user-select: text; }
 .g-nav { margin-top: 14px; }
 .g-nav .btn { font-size: 14px; padding: 0 12px; text-align: center; }
 .g-sub { display: block; color: var(--pom); font-size: 13.5px; margin-top: 2px; }
+
+/* ---------- слова из 2 и 3 букв ---------- */
+.lw-head { padding: 8px 14px; background: var(--snow); color: var(--muted); font: 600 15px var(--serif); border-bottom: 1px solid var(--line); }
+.lw-letters { display: inline-flex; gap: 4px; margin: 4px 0 2px; }
+.lw-letters i { font-style: normal; min-width: 26px; padding: 1px 6px; text-align: center; border-radius: 6px; background: var(--soft); color: var(--indigo-ink); font: 600 14px var(--serif); }
+.lw-note { margin-top: 10px; }

@@ -305,6 +305,10 @@ p { margin: 0 0 10px; }
   font-size: 16px; line-height: 1.2; transition: opacity .3s, transform .15s;
 }
 .tile.kum { font-size: 18px; font-weight: 600; color: var(--indigo); }
+.tile { display: flex; align-items: center; justify-content: space-between; gap: 6px; text-align: left; padding: 8px 6px 8px 12px; }
+.tile-t { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+.tile .say.opt-say { flex: none; width: 32px; height: 32px; }
+.tile .say.opt-say svg { width: 17px; height: 17px; }
 .tile.sel { border-color: var(--indigo); background: #E7EAF6; }
 .tile.bad { border-color: var(--pom); background: var(--pom-bg); animation: shake .3s; }
 .tile.gone { opacity: 0; pointer-events: none; transform: scale(.94); }
@@ -451,3 +455,4 @@ input { -webkit-user-select: text; user-select: text; }
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { transition-duration: 0s !important; animation: none !important; }
 }
+.tile.sel .say { background: var(--paper); }

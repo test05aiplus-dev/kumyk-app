@@ -314,6 +314,7 @@
     if (!el) return;
     stopSeq();
     if (el.classList.contains("say")) { e.stopPropagation(); e.preventDefault(); }
+    if (el.getAttribute("data-say-lang") === "ru") { stopSpeech(); speakRu(cleanRu(el.getAttribute("data-say"))); return; }
     say(el.getAttribute("data-say"), { pitch: parseFloat(el.getAttribute("data-pitch")) || 1, ru: el.getAttribute("data-say-ru") });
   }, true);
 
@@ -552,11 +553,8 @@
         '</div>' +
         '<button class="skip-all" id="skipAll">Пропустить всё</button>';
       var f = document.getElementById("flash");
-      if (store.settings.autoCards && canSay(w[0])) timers.push(setTimeout(function () { say(w[0]); }, 250));
-      function flip() {
-        var toBack = f.classList.toggle("flipped");
-        if (toBack && store.settings.autoCards && store.settings.sayRu) { stopSpeech(); speakRu(cleanRu(w[1])); }
-      }
+      // Озвучка на карточках — только по кнопке с динамиком
+      function flip() { f.classList.toggle("flipped"); }
       f.onclick = flip;
       f.onkeydown = function (e) { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); flip(); } };
       document.getElementById("yes").onclick = function () { snapshot(w); srsAnswer(w[0], true); status[w[0]] = "yes"; known++; addXp(2); i++; draw(); };
@@ -770,8 +768,8 @@
     var base = q.split(" (")[0];
     return base.replace("___", answer);
   }
-  function optSay(text) {
-    return '<span class="say opt-say" data-say="' + esc(text) + '" role="button" aria-label="Произнести «' + esc(text) + '»">' + SPEAKER + '</span>';
+  function optSay(text, lang) {
+    return '<span class="say opt-say" data-say="' + esc(text) + '"' + (lang ? ' data-say-lang="' + lang + '"' : '') + ' role="button" aria-label="Произнести «' + esc(text) + '»">' + SPEAKER + '</span>';
   }
 
   function quiz(opts) {
@@ -846,10 +844,10 @@
     var right = shuffle(pairs.map(function (p, i) { return { i: i, t: p[1] }; }));
     var selL = null, selR = null, found = 0, mistakes = 0, start = Date.now();
 
-    var html = '<p class="muted small">Нажмите слово слева, затем его перевод справа.</p><div class="match">';
+    var html = '<p class="muted small">Нажмите слово слева, затем его перевод справа. Чтобы услышать слово, нажмите на динамик внутри поля.</p><div class="match">';
     for (var r = 0; r < pairs.length; r++) {
-      html += '<button class="tile kum" data-side="L" data-i="' + left[r].i + '" data-say="' + esc(left[r].t) + '">' + esc(left[r].t) + '</button>' +
-              '<button class="tile" data-side="R" data-i="' + right[r].i + '">' + esc(right[r].t) + '</button>';
+      html += '<button class="tile kum" data-side="L" data-i="' + left[r].i + '"><span class="tile-t">' + esc(left[r].t) + '</span>' + optSay(left[r].t) + '</button>' +
+              '<button class="tile" data-side="R" data-i="' + right[r].i + '"><span class="tile-t">' + esc(right[r].t) + '</span>' + optSay(right[r].t, "ru") + '</button>';
     }
     view.innerHTML = html + '</div><p class="muted small" style="margin-top:12px">Ошибок: <span id="mc">0</span></p>';
 
@@ -1214,7 +1212,7 @@
       '<div class="settings">' +
         '<button class="switch wide" id="setTts" aria-pressed="' + store.settings.tts + '"><span>Синтез речи для слов без записи</span><i></i></button>' +
         '<button class="switch wide" id="setRu" aria-pressed="' + store.settings.sayRu + '"><span>Озвучивать перевод на русский</span><i></i></button>' +
-        '<button class="switch wide" id="setAuto" aria-pressed="' + store.settings.autoCards + '"><span>Произносить сразу: слово на карточке и правильный ответ в упражнениях</span><i></i></button>' +
+        '<button class="switch wide" id="setAuto" aria-pressed="' + store.settings.autoCards + '"><span>Произносить правильный ответ в упражнениях сразу</span><i></i></button>' +
         '<button class="btn soft block" id="testVoice">' + SPEAKER + ' Проверить: «Ассаламу алайкум»</button>' +
         '<p class="small muted" id="voiceInfo">' + voiceInfo() + '</p>' +
       '</div>' +

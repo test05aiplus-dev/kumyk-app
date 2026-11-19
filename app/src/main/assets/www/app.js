@@ -981,6 +981,7 @@
         '<button data-dir="kr" class="' + (dictState.dir === "kr" ? "on" : "") + '">Къумукъ → Русский</button>' +
         '<button data-dir="rk" class="' + (dictState.dir === "rk" ? "on" : "") + '">Русский → Къумукъ</button></div>' +
       '<div class="dict-meta"><span id="dcount"></span><button class="chip' + (dictState.course ? " on" : "") + '" id="dcourse">Слова курса</button></div>' +
+      '<div class="dict-play"><button class="play-btn" id="dplay">' + PLAY + '<span>Прослушать все</span></button></div>' +
       '<div class="wordlist dict-list" id="dlist"></div>';
     var input = document.getElementById("dq");
     input.oninput = function () { dictState.q = input.value; drawList(); };
@@ -1018,17 +1019,23 @@
         return pa - pb;
       });
     }
+    stopSeq();
     document.getElementById("dcount").textContent = "Найдено: " + list.length;
     var el = document.getElementById("dlist");
+    var shown = list.slice(0, 300);
+    var pb = document.getElementById("dplay");
+    pb.hidden = !list.length;
+    // «Прослушать все» — слова, которые сейчас в списке (с учётом поиска и фильтра)
+    bindPlayAll(pb, shown.map(function (w, i) { return { text: w.k, ru: w.r, pitch: 1, el: "dw" + i }; }), "Прослушать все");
     if (!list.length) {
       el.innerHTML = '<div class="empty">Такого слова пока нет в словаре. Проверьте написание или переключите направление перевода.</div>';
       return;
     }
-    el.innerHTML = list.slice(0, 300).map(function (w) {
+    el.innerHTML = shown.map(function (w, i) {
       var a = kr ? '<span class="kum">' + hl(w.k, q) + '</span>' : '<span>' + hl(w.r, q) + '</span>';
       var b = kr ? '<span class="ru">' + esc(w.r) : '<span class="ru kum" style="font-size:17px;color:var(--indigo);font-weight:600">' + esc(w.k);
       b += (w.lesson ? '<span class="tag">урок ' + w.lesson + '</span>' : '') + '</span>';
-      return '<div class="item">' + sayBtn(w.k, "", w.r) + '<span class="dmain">' + a + b + '</span></div>';
+      return '<div class="item" id="dw' + i + '">' + sayBtn(w.k, "", w.r) + '<span class="dmain">' + a + b + '</span></div>';
     }).join("");
   }
 

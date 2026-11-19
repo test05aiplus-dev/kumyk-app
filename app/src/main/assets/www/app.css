@@ -544,3 +544,7 @@ input { -webkit-user-select: text; user-select: text; }
 .team-card h3 { font-family: var(--serif); font-size: 18.5px; margin: 2px 0 2px; }
 .team-role { color: var(--pom); font-weight: 600; font-size: 14px; margin: 0 0 6px; }
 .team-card p:last-child { margin: 0; font-size: 15px; }
+
+.dict-play { margin: 0 0 10px; }
+.dict-play .play-btn[hidden] { display: none; }
+.dict-list .item.playing { background: #FCEFCF; }

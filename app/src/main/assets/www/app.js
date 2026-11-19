@@ -308,6 +308,13 @@
     return '<button class="say' + (extra ? " " + extra : "") + '" data-say="' + esc(text) + '"' + (ru ? ' data-say-ru="' + esc(ru) + '"' : '') +
       ' aria-label="Произнести «' + esc(text) + '»">' + SPEAKER + '</button>';
   }
+  // Значок «Премиум» внутри ссылки ведёт в профиль, к разделу «Премиум»
+  document.addEventListener("click", function (e) {
+    var g = e.target.closest ? e.target.closest("[data-goto]") : null;
+    if (!g) return;
+    e.preventDefault(); e.stopPropagation();
+    location.hash = g.getAttribute("data-goto");
+  }, true);
   // Перехватываем нажатия на всё с data-say раньше остальных обработчиков
   document.addEventListener("click", function (e) {
     var el = e.target.closest ? e.target.closest("[data-say]") : null;
@@ -352,7 +359,7 @@
     if (r === "dict") return dict();
     if (r === "sprint") return sprint(null);
     if (r === "dialogs") return dialogs();
-    if (r === "profile") return profile();
+    if (r === "profile") return profile(h[1]);
     if (r === "phrases") return phrases();
     if (r === "premium") return premiumScreen(h[1]);
     home();
@@ -393,7 +400,7 @@
         link("#/sprint", "⚡", "Спринт", "Слова из всех уроков на время") +
         link("#/dict", "📖", "Словарь", DICT.length + " слов, два направления") +
         link("#/dialogs", "💬", "Диалоги и пословицы", "Живая речь с переводом") +
-        link("#/phrases", "📜", "Фразеологический словарь" + (hasPremium() ? "" : ' <span class="badge">Премиум</span>'), window.PHRASES.length + " устойчивых выражений с дословным переводом") +
+        link("#/phrases", "📜", "Фразеологический словарь" + (hasPremium() ? "" : ' <span class="badge" role="link" tabindex="0" data-goto="#/profile/premium">Премиум</span>'), window.PHRASES.length + " устойчивых выражений с дословным переводом") +
         link("#/lessons", "🗺️", "Программа курса", STAGES.length + " " + plural(STAGES.length, "этап", "этапа", "этапов") + " от алфавита до речи") +
       '</nav>';
 
@@ -1186,7 +1193,7 @@
     if (e === "loading") return rec + "Синтезатор речи загружается, загляните сюда через пару секунд.";
     return rec + "Синтезатор речи на телефоне не найден, поэтому звучат только записи.";
   }
-  function profile() {
+  function profile(focus) {
     setScreen("Профиль", null, "profile");
     var done = LESSONS.filter(function (l) { return lessonState(l.id).done; }).length;
     var learned = Object.keys(store.srs).filter(function (k) { return store.srs[k].box >= 2; }).length;
@@ -1203,11 +1210,11 @@
         '<div><b>' + store.sprintBest + '</b><span>рекорд спринта</span></div>' +
         '<div><b>' + store.days.length + '</b><span>' + plural(store.days.length, "день", "дня", "дней") + ' занятий</span></div>' +
       '</div>' +
-      '<h2>Премиум</h2>' +
+      '<section id="premSection" class="prem-section"><h2 style="margin-top:0">Премиум</h2>' +
       '<div class="settings"><p class="prem-status">' + esc(premiumStatus()) + '</p>' +
         (hasPremium() ? '<button class="btn block ghost" id="premReset">Отключить премиум (для теста)</button>'
-                      : '<a class="btn block accent" href="#/premium/profile">Открыть премиум</a>') +
-      '</div>' +
+                      : '<a class="btn block accent" id="openPrem" href="#/premium/profile">Открыть премиум</a>') +
+      '</div></section>' +
       '<h2>Озвучка</h2>' +
       '<div class="settings">' +
         '<button class="switch wide" id="setTts" aria-pressed="' + store.settings.tts + '"><span>Синтез речи для слов без записи</span><i></i></button>' +
@@ -1233,6 +1240,16 @@
     document.getElementById("setAuto").onclick = function () {
       store.settings.autoCards = !store.settings.autoCards; save(); this.setAttribute("aria-pressed", store.settings.autoCards);
     };
+    if (focus === "premium") {
+      var sec = document.getElementById("premSection");
+      if (sec) {
+        sec.scrollIntoView({ block: "center" });
+        sec.classList.add("focus");
+        timers.push(setTimeout(function () { sec.classList.remove("focus"); }, 1800));
+        var op = document.getElementById("openPrem");
+        if (op) op.focus({ preventScroll: true });
+      }
+    }
     var pr = document.getElementById("premReset");
     if (pr) pr.onclick = function () { store.premium = null; save(); toast("Премиум отключён"); profile(); };
     document.getElementById("testVoice").onclick = function () { say("Ассаламу алайкум", { ru: "Здравствуйте" }); };

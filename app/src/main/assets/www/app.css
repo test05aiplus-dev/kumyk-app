@@ -456,3 +456,7 @@ input { -webkit-user-select: text; user-select: text; }
   *, *::before, *::after { transition-duration: 0s !important; animation: none !important; }
 }
 .tile.sel .say { background: var(--paper); }
+
+.prem-section { border-radius: var(--r-md); margin: 18px -8px 0; padding: 10px 8px 2px; transition: background .4s; }
+.prem-section.focus { background: #FCEFCF; }
+.badge[data-goto] { cursor: pointer; }

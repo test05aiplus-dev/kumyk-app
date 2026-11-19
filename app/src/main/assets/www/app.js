@@ -366,6 +366,7 @@
     if (r === "services") return services();
     if (r === "order") return orderForm(h[1]);
     if (r === "orders") return ordersScreen(h[1]);
+    if (r === "grammar") return grammar(h[1]);
     if (r === "social") return socialScreen();
     if (r === "contacts") return contactsScreen();
     if (r === "team") return teamScreen();
@@ -658,7 +659,7 @@
   function sprint(l) {
     var pool = l ? l.words.map(function (w) { return { k: w[0], r: w[1] }; }) : COURSE_WORDS;
     var back = l ? "#/lesson/" + l.id : null;
-    setScreen(l ? "Спринт: урок " + l.id : "Спринт", back, l ? "lessons" : "sprint");
+    setScreen(l ? "Спринт: урок " + l.id : "Спринт", l ? back : "#/home", l ? "lessons" : "home");
     var DURATION = 60;
 
     function intro() {
@@ -1649,6 +1650,41 @@
       return '<a class="order-card link" href="#/orders/' + o.id + '"><div class="order-top"><b>' + esc(o.title) + '</b><span class="tag-yes">' + STATUS[o.status] + '</span></div>' +
         '<p class="small muted">' + esc(o.id) + ', ' + esc(o.date) + '</p><p class="order-sum">' + rub(o.total) + '</p></a>';
     }).join("") : '<div class="empty">Заказов пока нет. Выберите услугу, чтобы оформить первый.</div><a class="btn block" href="#/services">К услугам</a>';
+  }
+
+  /* ================= справочник грамматики ================= */
+  function grammar(id) {
+    var G = window.GRAMMAR || [];
+    if (!id) {
+      setScreen("Справочник", null, "grammar");
+      view.innerHTML = '<p class="muted">Справочник грамматики: правила и таблицы форм с озвучкой.</p>' +
+        '<nav class="links">' + G.map(function (g) { return link("#/grammar/" + g.id, g.icon, esc(g.title), esc(g.intro.split(". ")[0].replace(/\.$/, ""))); }).join("") + '</nav>';
+      return;
+    }
+    var g = G.filter(function (x) { return x.id === id; })[0];
+    if (!g) return grammar();
+    setScreen(g.title, "#/grammar", "grammar");
+    var html = '<p class="g-intro">' + esc(g.intro) + '</p>';
+    (g.tables || []).forEach(function (t) {
+      var kum = t.kum || [];
+      html += '<div class="table-wrap"><table class="g-table"><thead><tr>' + t.head.map(function (h) { return '<th>' + esc(h) + '</th>'; }).join("") +
+        '</tr></thead><tbody>' + t.rows.map(function (r) {
+          return '<tr>' + r.map(function (c, ci) {
+            if (kum.indexOf(ci) >= 0 && c !== "—") {
+              return '<td class="kum g-say" data-say="' + esc(c) + '" role="button" tabindex="0">' + esc(c) + '</td>';
+            }
+            var parts = String(c).split("|");
+            return '<td>' + esc(parts[0]) + (parts[1] ? '<small class="g-sub">' + esc(parts[1]) + '</small>' : '') + '</td>';
+          }).join("") + '</tr>';
+        }).join("") + '</tbody></table></div>';
+    });
+    if (g.notes) html += g.notes.map(function (n) { return '<p class="note">' + esc(n) + '</p>'; }).join("");
+    html += '<p class="small muted">Нажмите на кумыкскую форму в таблице, чтобы её услышать.</p>';
+    var i = G.indexOf(g);
+    html += '<div class="row g-nav">' +
+      (i > 0 ? '<a class="btn soft" href="#/grammar/' + G[i - 1].id + '">' + esc(G[i - 1].title) + '</a>' : '<span></span>') +
+      (i < G.length - 1 ? '<a class="btn" href="#/grammar/' + G[i + 1].id + '">' + esc(G[i + 1].title) + '</a>' : '<span></span>') + '</div>';
+    view.innerHTML = html;
   }
 
   /* ================= о проекте: соцсети, контакты, команда ================= */

@@ -548,3 +548,16 @@ input { -webkit-user-select: text; user-select: text; }
 .dict-play { margin: 0 0 10px; }
 .dict-play .play-btn[hidden] { display: none; }
 .dict-list .item.playing { background: #FCEFCF; }
+
+/* ---------- справочник ---------- */
+.g-intro { font-size: 16.5px; }
+.g-table { width: 100%; border-collapse: collapse; font-size: 15px; }
+.g-table th { text-align: left; font-weight: 500; font-size: 13px; color: var(--muted); padding: 10px; border-bottom: 1px solid var(--line); background: var(--snow); }
+.g-table td { padding: 10px; border-bottom: 1px solid var(--line); vertical-align: top; }
+.g-table tr:last-child td { border-bottom: 0; }
+.g-table td.kum { font-size: 17px; font-weight: 600; color: var(--indigo); white-space: nowrap; }
+.g-say { cursor: pointer; text-decoration: underline dotted rgba(34,48,107,.35); text-underline-offset: 4px; }
+.g-say:active { background: #FCEFCF; }
+.g-nav { margin-top: 14px; }
+.g-nav .btn { font-size: 14px; padding: 0 12px; text-align: center; }
+.g-sub { display: block; color: var(--pom); font-size: 13.5px; margin-top: 2px; }

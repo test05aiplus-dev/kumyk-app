@@ -366,6 +366,9 @@
     if (r === "services") return services();
     if (r === "order") return orderForm(h[1]);
     if (r === "orders") return ordersScreen(h[1]);
+    if (r === "social") return socialScreen();
+    if (r === "contacts") return contactsScreen();
+    if (r === "team") return teamScreen();
     if (r === "premium") return premiumScreen(h[1]);
     home();
   }
@@ -426,7 +429,13 @@
       '<nav class="links">' + Object.keys(COMMUNITY).map(function (k) {
         var c = COMMUNITY[k];
         return link("#/community/" + k, c.icon, c.title, c.desc);
-      }).join("") + '</nav>';
+      }).join("") + '</nav>' +
+      '<h2>О проекте</h2>' +
+      '<nav class="links">' +
+        link("#/social", "📣", "Мы в соцсетях", window.ABOUT.social.map(function (x) { return x.title; }).join(", ")) +
+        link("#/contacts", "☎️", "Наши контакты", "Почта и WhatsApp") +
+        link("#/team", "👥", "Наша команда", "Кто делает курс") +
+      '</nav>';
 
     var ht = document.getElementById("hideTip");
     if (ht) ht.onclick = function () {
@@ -1633,6 +1642,68 @@
       return '<a class="order-card link" href="#/orders/' + o.id + '"><div class="order-top"><b>' + esc(o.title) + '</b><span class="tag-yes">' + STATUS[o.status] + '</span></div>' +
         '<p class="small muted">' + esc(o.id) + ', ' + esc(o.date) + '</p><p class="order-sum">' + rub(o.total) + '</p></a>';
     }).join("") : '<div class="empty">Заказов пока нет. Выберите услугу, чтобы оформить первый.</div><a class="btn block" href="#/services">К услугам</a>';
+  }
+
+  /* ================= о проекте: соцсети, контакты, команда ================= */
+  var SOCIAL_COLORS = { telegram: "#2A8BC9", instagram: "#C13584", max: "#5B3FD9", tiktok: "#171B30" };
+  function demoNote(what) {
+    return window.ABOUT.demo ? '<p class="demo-note">Пример: ' + what + ' вымышленные и будут заменены.</p>' : '';
+  }
+  function socialScreen() {
+    setScreen("Мы в соцсетях", "#/home", "home");
+    view.innerHTML = '<p class="muted">Подписывайтесь — там слово дня, короткие уроки и новости проекта.</p>' +
+      '<nav class="links">' + window.ABOUT.social.map(function (s) {
+        var ic = '<span class="soc-ic" style="background:' + (SOCIAL_COLORS[s.id] || "var(--indigo)") + '">' + esc(s.title.charAt(0)) + '</span>';
+        var sub = s.url ? esc(s.note) : esc(s.note) + '. Ссылка появится позже';
+        return '<a href="#" class="soc-row' + (s.url ? '' : ' soon') + '" data-social="' + s.id + '">' + ic +
+          '<span><b>' + esc(s.title) + '</b><small>' + sub + '</small></span></a>';
+      }).join("") + '</nav>';
+    view.querySelectorAll("[data-social]").forEach(function (a) {
+      a.onclick = function (e) {
+        e.preventDefault();
+        var s = window.ABOUT.social.filter(function (x) { return x.id === a.getAttribute("data-social"); })[0];
+        if (s && s.url) openExternal(s.url); else toast("Ссылка на " + s.title + " появится позже");
+      };
+    });
+  }
+  function contactsScreen() {
+    setScreen("Наши контакты", "#/home", "home");
+    var c = window.ABOUT.contacts, demo = window.ABOUT.demo;
+    var wa = String(c.whatsapp || "").replace(/\D/g, "");
+    view.innerHTML = demoNote("почта и номер") +
+      '<div class="contact-list">' +
+        (c.email ? '<a class="contact-row" href="#" id="cMail"><span class="ic" aria-hidden="true">✉️</span><span><small>Почта</small><b>' + esc(c.email) + '</b></span></a>' : '') +
+        (c.whatsapp ? '<a class="contact-row" href="#" id="cWa"><span class="ic" aria-hidden="true">💬</span><span><small>WhatsApp</small><b>' + esc(c.whatsapp) + '</b></span></a>' : '') +
+        (c.hours ? '<div class="contact-row"><span class="ic" aria-hidden="true">🕘</span><span><small>Когда отвечаем</small><b>' + esc(c.hours) + '</b></span></div>' : '') +
+      '</div>' +
+      '<a class="btn block" href="#/community/feedback">Написать нам из приложения</a>';
+    var m = document.getElementById("cMail");
+    if (m) m.onclick = function (e) { e.preventDefault(); openExternal("mailto:" + c.email + "?subject=" + encodeURIComponent("Къумукъ тил")); };
+    var w = document.getElementById("cWa");
+    if (w) w.onclick = function (e) {
+      e.preventDefault();
+      if (demo) { toast("Это номер-пример. Настоящий появится позже"); return; }
+      openExternal("https://wa.me/" + wa);
+    };
+  }
+  function avatar(p, i) {
+    if (p.photo) return '<img class="avatar-img" src="' + esc(p.photo) + '" alt="Фото: ' + esc(p.name) + '">';
+    var bg = ["#22306B", "#B8243C", "#2F8A64", "#8A5A1F"][i % 4];
+    var ini = p.name.split(/\s+/).map(function (w) { return w.charAt(0); }).join("").slice(0, 2).toUpperCase();
+    return '<svg class="avatar-img" viewBox="0 0 120 120" role="img" aria-label="Аватар: ' + esc(p.name) + '">' +
+      '<rect width="120" height="120" fill="' + bg + '"/>' +
+      '<g fill="#E3A52B" opacity=".9"><path d="M0 104l8 8-8 8zM120 104l-8 8 8 8z"/>' +
+      [16, 40, 64, 88, 112].map(function (x) { return '<path d="M' + x + ' 104l8 8-8 8-8-8z"/>'; }).join("") + '</g>' +
+      '<text x="60" y="68" text-anchor="middle" font-family="Lora, Georgia, serif" font-size="40" font-weight="600" fill="#fff">' + esc(ini) + '</text></svg>';
+  }
+  function teamScreen() {
+    setScreen("Наша команда", "#/home", "home");
+    view.innerHTML = demoNote("имена, фото и описания") +
+      '<p class="muted">Люди, которые делают курс кумыкского языка.</p>' +
+      window.ABOUT.team.map(function (p, i) {
+        return '<article class="team-card">' + avatar(p, i) +
+          '<div><h3>' + esc(p.name) + '</h3><p class="team-role">' + esc(p.role) + '</p><p>' + esc(p.bio) + '</p></div></article>';
+      }).join("");
   }
 
   /* ================= профиль ================= */

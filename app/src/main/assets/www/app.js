@@ -6,7 +6,7 @@
   var store = load();
 
   function blank() {
-    return { name: "", xp: 0, lessons: {}, srs: {}, sprintBest: 0, days: [], lastLesson: 1,
+    return { name: "", xp: 0, lessons: {}, srs: {}, sprintBest: 0, days: [], lastLesson: 1, premium: null,
              settings: { tts: true, autoCards: true } };
   }
   function load() {
@@ -302,6 +302,8 @@
     if (r === "sprint") return sprint(null);
     if (r === "dialogs") return dialogs();
     if (r === "profile") return profile();
+    if (r === "phrases") return phrases();
+    if (r === "premium") return premiumScreen(h[1]);
     home();
   }
   window.addEventListener("hashchange", route);
@@ -340,6 +342,7 @@
         link("#/sprint", "⚡", "Спринт", "Слова из всех уроков на время") +
         link("#/dict", "📖", "Словарь", DICT.length + " слов, два направления") +
         link("#/dialogs", "💬", "Диалоги и пословицы", "Живая речь с переводом") +
+        link("#/phrases", "📜", "Фразеологический словарь" + (hasPremium() ? "" : ' <span class="badge">Премиум</span>'), window.PHRASES.length + " устойчивых выражений с дословным переводом") +
         link("#/lessons", "🗺️", "Программа курса", STAGES.length + " " + plural(STAGES.length, "этап", "этапа", "этапов") + " от алфавита до речи") +
       '</nav>';
 
@@ -426,13 +429,17 @@
     setScreen("Экспресс-словарь", "#/lesson/" + l.id, "lessons");
     var hide = false;
     function draw() {
+      stopSeq();
       view.innerHTML =
-        '<div class="vocab-tools"><span class="muted small">' + l.words.length + ' ' + plural(l.words.length, "слово", "слова", "слов") + '</span>' +
+        '<div class="vocab-tools"><button class="play-btn" id="playAll">' + PLAY + '<span>Прослушать все</span></button>' +
         '<button class="switch" id="hideSw" aria-pressed="' + hide + '"><i></i>Проверить себя</button></div>' +
         '<div class="wordlist">' + l.words.map(function (w, i) {
-          return '<div class="vrow">' + sayBtn(w[0]) + '<button class="vword" data-i="' + i + '"><span class="kum">' + esc(w[0]) + '</span><span class="ru' + (hide ? " hide" : "") + '">' + esc(w[1]) + '</span></button></div>';
+          return '<div class="vrow" id="v' + i + '">' + sayBtn(w[0]) + '<button class="vword" data-i="' + i + '"><span class="kum">' + esc(w[0]) + '</span><span class="ru' + (hide ? " hide" : "") + '">' + esc(w[1]) + '</span></button></div>';
         }).join("") + '</div><div style="height:16px"></div>' + finishBar(l, "vocab");
       document.getElementById("hideSw").onclick = function () { hide = !hide; draw(); };
+      bindPlayAll(document.getElementById("playAll"), l.words.map(function (w, i) {
+        return { text: w[0], pitch: 1, el: "v" + i };
+      }), "Прослушать все");
       view.querySelectorAll(".wordlist .vword").forEach(function (b) {
         b.onclick = function () { b.querySelector(".ru").classList.toggle("hide"); };
       });
@@ -920,6 +927,30 @@
   }
 
   /* ================= диалоги и пословицы ================= */
+  // Кнопка «Слушать»: проигрывает список подряд, подсвечивает элемент с id из it.el
+  function bindPlayAll(btn, items, label) {
+    btn.onclick = function () {
+      if (btn.classList.contains("on")) { stopSeq(); stopSpeech(); return; }
+      view.querySelectorAll(".playing").forEach(function (x) { x.classList.remove("playing"); });
+      btn.classList.add("on");
+      btn.innerHTML = STOP + "<span>Стоп</span>";
+      playSeq(items, {
+        step: function (it) {
+          view.querySelectorAll(".playing").forEach(function (x) { x.classList.remove("playing"); });
+          var el = document.getElementById(it.el);
+          if (el) {
+            el.classList.add("playing");
+            if (el.scrollIntoView) el.scrollIntoView({ block: "nearest", behavior: "smooth" });
+          }
+        },
+        end: function () {
+          view.querySelectorAll(".playing").forEach(function (x) { x.classList.remove("playing"); });
+          btn.classList.remove("on");
+          btn.innerHTML = PLAY + "<span>" + label + "</span>";
+        }
+      });
+    };
+  }
   var PLAY = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5v14l11-7z"/></svg>';
   var STOP = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 7h10v10H7z"/></svg>';
   function dialogs() {
@@ -949,39 +980,133 @@
 
       document.getElementById("sw").onclick = function () { hideRu = !hideRu; draw(); };
 
-      function bindPlay(btn, items, label) {
-        btn.onclick = function () {
-          if (btn.classList.contains("on")) { stopSeq(); stopSpeech(); return; }
-          view.querySelectorAll(".playing").forEach(function (x) { x.classList.remove("playing"); });
-          btn.classList.add("on");
-          btn.innerHTML = STOP + "<span>Стоп</span>";
-          playSeq(items, {
-            step: function (it) {
-              view.querySelectorAll(".playing").forEach(function (x) { x.classList.remove("playing"); });
-              var el = document.getElementById(it.el);
-              if (el) {
-                el.classList.add("playing");
-                if (el.scrollIntoView) el.scrollIntoView({ block: "nearest", behavior: "smooth" });
-              }
-            },
-            end: function () {
-              view.querySelectorAll(".playing").forEach(function (x) { x.classList.remove("playing"); });
-              btn.classList.remove("on");
-              btn.innerHTML = PLAY + "<span>" + label + "</span>";
-            }
-          });
-        };
-      }
       view.querySelectorAll("[data-dialog]").forEach(function (btn) {
         var di = +btn.getAttribute("data-dialog");
         // у собеседников разная высота голоса, чтобы их было легко различить
-        bindPlay(btn, window.DIALOGS[di].lines.map(function (ln, li) {
+        bindPlayAll(btn, window.DIALOGS[di].lines.map(function (ln, li) {
           return { text: ln[1], pitch: ln[0] === "А" ? 1.1 : 0.82, el: "b" + di + "_" + li };
         }), "Слушать");
       });
-      bindPlay(document.getElementById("playProv"), window.PROVERBS.map(function (p, pi) {
+      bindPlayAll(document.getElementById("playProv"), window.PROVERBS.map(function (p, pi) {
         return { text: p[0], pitch: 1, el: "p" + pi };
       }), "Слушать все");
+    }
+    draw();
+  }
+
+  /* ================= премиум (тестовый режим) ================= */
+  // Оплата только имитируется: деньги не списываются. Для настоящих продаж
+  // в Google Play и App Store нужно подключить их встроенные покупки.
+  var PLANS = [
+    { id: "month", title: "Месяц", price: 199, days: 30, note: "199 ₽ в месяц" },
+    { id: "forever", title: "Навсегда", price: 990, days: 0, note: "один платёж" }
+  ];
+  var PROMO = ["KUMYK", "КУМЫК", "TEST"];
+  function hasPremium() {
+    var p = store.premium;
+    if (!p || !p.active) return false;
+    if (p.until && Date.now() > p.until) return false;
+    return true;
+  }
+  function grantPremium(plan, via) {
+    var pl = PLANS.filter(function (x) { return x.id === plan; })[0] || PLANS[1];
+    store.premium = { active: true, plan: pl.id, via: via, since: Date.now(),
+                      until: pl.days ? Date.now() + pl.days * 86400000 : 0, test: true };
+    save();
+  }
+  function premiumStatus() {
+    if (!store.premium || !store.premium.active) return "Не подключён";
+    if (!hasPremium()) return "Срок истёк";
+    var p = store.premium;
+    var until = p.until ? "до " + new Date(p.until).toLocaleDateString("ru-RU") : "навсегда";
+    return "Активен " + until + (p.via === "promo" ? " (промокод)" : "") + " — тестовый режим";
+  }
+  var LOCK = '<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V8a4 4 0 018 0v3"/></svg>';
+
+  function phraseRow(p, i) {
+    return '<div class="phrase" id="ph' + i + '">' + sayBtn(p[0]) +
+      '<div class="ptext"><span class="kum">' + esc(p[0]) + '</span>' +
+      '<span class="lit">дословно: «' + esc(p[1]) + '»</span>' +
+      '<span class="mean">' + esc(p[2]) + '</span></div></div>';
+  }
+  function phrases() {
+    setScreen("Фразеологический словарь", "#/home", "home");
+    var all = window.PHRASES, free = window.FREE_PHRASES || 3;
+    var open = hasPremium();
+    var visible = open ? all : all.slice(0, free);
+    var html = '<p class="muted">Устойчивые выражения: как звучат, что значат дословно и что на самом деле.</p>' +
+      '<div class="vocab-tools">' +
+        '<button class="play-btn" id="playPh">' + PLAY + '<span>Прослушать ' + (open ? "все" : "бесплатные") + '</span></button>' +
+        '<span class="small ' + (open ? "prem-on" : "muted") + '">' + (open ? "Премиум открыт" : "Открыто " + free + " из " + all.length) + '</span>' +
+      '</div>' +
+      '<div class="phrase-list">' + visible.map(phraseRow).join("") + '</div>';
+    if (!open) {
+      html += '<div class="locked-list" aria-hidden="true">' + all.slice(free, free + 4).map(function (p) {
+          return '<div class="phrase locked"><span class="lock">' + LOCK + '</span><div class="ptext"><span class="kum">' + esc(p[0]) +
+            '</span><span class="mean blur">••••••• ••••• •••••••••</span></div></div>';
+        }).join("") + '</div>' +
+        '<section class="paywall">' +
+          '<h3>Ещё ' + (all.length - free) + ' ' + plural(all.length - free, "выражение", "выражения", "выражений") + ' в премиум-доступе</h3>' +
+          '<p>Полный фразеологический словарь с дословным переводом, значением и озвучкой. Новые выражения добавляются в доступ автоматически.</p>' +
+          '<a class="btn block accent" href="#/premium/phrases">Открыть премиум</a>' +
+        '</section>';
+    }
+    view.innerHTML = html;
+    bindPlayAll(document.getElementById("playPh"), visible.map(function (p, i) {
+      return { text: p[0], pitch: 1, el: "ph" + i };
+    }), "Прослушать " + (open ? "все" : "бесплатные"));
+  }
+
+  function premiumScreen(from) {
+    var backTo = from === "phrases" ? "#/phrases" : "#/profile";
+    setScreen("Премиум", backTo, from === "phrases" ? "home" : "profile");
+    if (hasPremium()) {
+      view.innerHTML = '<div class="result"><div class="big">✓</div><p>Премиум уже открыт. ' + esc(premiumStatus()) + '.</p>' +
+        '<a class="btn block" href="#/phrases">К фразеологическому словарю</a></div>';
+      return;
+    }
+    var chosen = "month";
+    function draw(step) {
+      if (step === "paying") {
+        view.innerHTML = '<div class="result"><div class="spinner" aria-hidden="true"></div><p>Проводим тестовый платёж…</p></div>';
+        return;
+      }
+      view.innerHTML =
+        '<div class="test-banner"><b>Тестовый режим</b>Оплата только имитируется, деньги не списываются. Так можно проверить, как работает платный раздел.</div>' +
+        '<h2>Что входит</h2>' +
+        '<ul class="perks"><li>Фразеологический словарь целиком: ' + window.PHRASES.length + ' выражений</li>' +
+        '<li>Дословный перевод, значение и озвучка каждого</li><li>Все будущие выражения без доплат</li></ul>' +
+        '<h2>Тариф</h2>' +
+        '<div class="plans" role="radiogroup">' + PLANS.map(function (pl) {
+          return '<button class="plan' + (pl.id === chosen ? " on" : "") + '" role="radio" aria-checked="' + (pl.id === chosen) + '" data-plan="' + pl.id + '">' +
+            '<b>' + pl.title + '</b><span class="price">' + pl.price + ' ₽</span><small>' + pl.note + '</small></button>';
+        }).join("") + '</div>' +
+        '<button class="btn block accent" id="pay">Оплатить ' + PLANS.filter(function (x) { return x.id === chosen; })[0].price + ' ₽ (тест)</button>' +
+        '<h2>Промокод</h2>' +
+        '<div class="promo"><input id="promo" placeholder="Например, KUMYK" autocomplete="off" autocapitalize="characters">' +
+        '<button class="btn soft" id="applyPromo">Применить</button></div>' +
+        '<p class="small muted" id="promoMsg"></p>';
+      view.querySelectorAll(".plan").forEach(function (b) {
+        b.onclick = function () { chosen = b.getAttribute("data-plan"); draw(); };
+      });
+      document.getElementById("pay").onclick = function () {
+        draw("paying");
+        timers.push(setTimeout(function () {
+          grantPremium(chosen, "test-payment");
+          toast("Премиум открыт (тестовый платёж)");
+          location.hash = backTo === "#/phrases" ? "#/phrases" : "#/profile";
+        }, 1400));
+      };
+      document.getElementById("applyPromo").onclick = function () {
+        var code = (document.getElementById("promo").value || "").trim().toUpperCase();
+        if (PROMO.indexOf(code) >= 0) {
+          grantPremium("forever", "promo");
+          toast("Промокод принят, премиум открыт");
+          location.hash = "#/phrases";
+        } else {
+          document.getElementById("promoMsg").textContent = code ? "Такого промокода нет. Проверьте написание." : "Введите промокод.";
+        }
+      };
     }
     draw();
   }
@@ -1015,6 +1140,11 @@
         '<div><b>' + store.sprintBest + '</b><span>рекорд спринта</span></div>' +
         '<div><b>' + store.days.length + '</b><span>' + plural(store.days.length, "день", "дня", "дней") + ' занятий</span></div>' +
       '</div>' +
+      '<h2>Премиум</h2>' +
+      '<div class="settings"><p class="prem-status">' + esc(premiumStatus()) + '</p>' +
+        (hasPremium() ? '<button class="btn block ghost" id="premReset">Отключить премиум (для теста)</button>'
+                      : '<a class="btn block accent" href="#/premium/profile">Открыть премиум</a>') +
+      '</div>' +
       '<h2>Озвучка</h2>' +
       '<div class="settings">' +
         '<button class="switch wide" id="setTts" aria-pressed="' + store.settings.tts + '"><span>Синтез речи для слов без записи</span><i></i></button>' +
@@ -1036,6 +1166,8 @@
     document.getElementById("setAuto").onclick = function () {
       store.settings.autoCards = !store.settings.autoCards; save(); this.setAttribute("aria-pressed", store.settings.autoCards);
     };
+    var pr = document.getElementById("premReset");
+    if (pr) pr.onclick = function () { store.premium = null; save(); toast("Премиум отключён"); profile(); };
     document.getElementById("testVoice").onclick = function () { say("Ассаламу алайкум"); };
     var armed = false;
     document.getElementById("reset").onclick = function () {

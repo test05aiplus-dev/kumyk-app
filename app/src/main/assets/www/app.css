@@ -400,6 +400,43 @@ html { -webkit-text-size-adjust: 100%; }
 body { -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
 input { -webkit-user-select: text; user-select: text; }
 
+/* ---------- фразеологизмы и премиум ---------- */
+.badge { display: inline-block; vertical-align: 2px; margin-left: 6px; padding: 2px 8px; border-radius: 999px; background: var(--saffron); color: var(--ink); font-size: 11.5px; font-weight: 600; }
+.vrow.playing { background: #FCEFCF; }
+.phrase-list, .locked-list { background: var(--paper); border: 1px solid var(--line); border-radius: var(--r-md); overflow: hidden; }
+.locked-list { margin-top: 10px; }
+.phrase { display: flex; gap: 12px; align-items: flex-start; padding: 12px; border-bottom: 1px solid var(--line); transition: background .2s; }
+.phrase:last-child { border-bottom: 0; }
+.phrase.playing { background: #FCEFCF; }
+.phrase .ptext { flex: 1; min-width: 0; }
+.phrase .kum { display: block; font-size: 18.5px; font-weight: 600; color: var(--indigo); }
+.phrase .lit { display: block; font-size: 13.5px; color: var(--muted); font-style: italic; margin-top: 2px; }
+.phrase .mean { display: block; margin-top: 3px; }
+.phrase.locked .kum { color: var(--muted); }
+.phrase .lock { flex: none; width: 40px; height: 40px; border-radius: 50%; background: #E7EAF6; display: grid; place-items: center; color: var(--muted); }
+.lock svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 2; }
+.blur { color: transparent; text-shadow: 0 0 8px rgba(23,27,48,.45); user-select: none; }
+.paywall { margin-top: 14px; padding: 18px 16px; border-radius: var(--r-lg); background: var(--indigo); color: #fff; }
+.paywall h3 { font-family: var(--serif); font-size: 20px; }
+.paywall p { color: #D5DAF0; font-size: 15px; }
+.prem-on { color: var(--moss); font-weight: 600; }
+.prem-status { margin: 0 0 10px; }
+.test-banner { background: #FCEFCF; border-radius: var(--r-md); padding: 12px 14px; font-size: 14.5px; margin-bottom: 6px; }
+.test-banner b { display: block; }
+.perks { margin: 0; padding-left: 20px; }
+.perks li { margin: 6px 0; }
+.plans { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 14px; }
+.plan { text-align: left; padding: 14px; border-radius: var(--r-md); border: 2px solid var(--line); background: var(--paper); }
+.plan.on { border-color: var(--pom); background: var(--pom-bg); }
+.plan b { display: block; font-size: 15px; }
+.plan .price { display: block; font: 600 26px/1.2 var(--serif); color: var(--indigo); margin: 2px 0; }
+.plan small { color: var(--muted); font-size: 13px; }
+.promo { display: flex; gap: 8px; }
+.promo input { flex: 1; min-width: 0; height: 50px; border-radius: 999px; border: 1.5px solid var(--line); background: var(--paper); padding: 0 16px; font-size: 16px; text-transform: uppercase; }
+.promo .btn { flex: none; }
+.spinner { width: 46px; height: 46px; margin: 10px auto 0; border-radius: 50%; border: 4px solid var(--line); border-top-color: var(--pom); animation: spin .8s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+
 /* ---------- тост ---------- */
 .toast {
   position: fixed; left: 50%; bottom: calc(var(--tab-h) + 16px + env(safe-area-inset-bottom));

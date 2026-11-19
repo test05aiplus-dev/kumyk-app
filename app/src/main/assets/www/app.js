@@ -361,6 +361,7 @@
     if (r === "dialogs") return dialogs();
     if (r === "profile") return profile(h[1]);
     if (r === "phrases") return phrases();
+    if (r === "prem") return premSection(h[1]);
     if (r === "premium") return premiumScreen(h[1]);
     home();
   }
@@ -400,8 +401,16 @@
         link("#/sprint", "⚡", "Спринт", "Слова из всех уроков на время") +
         link("#/dict", "📖", "Словарь", DICT.length + " слов, два направления") +
         link("#/dialogs", "💬", "Диалоги и пословицы", "Живая речь с переводом") +
-        link("#/phrases", "📜", "Фразеологический словарь" + (hasPremium() ? "" : ' <span class="badge" role="link" tabindex="0" data-goto="#/profile/premium">Премиум</span>'), window.PHRASES.length + " устойчивых выражений с дословным переводом") +
         link("#/lessons", "🗺️", "Программа курса", STAGES.length + " " + plural(STAGES.length, "этап", "этапа", "этапов") + " от алфавита до речи") +
+      '</nav>' +
+      '<div class="group-head"><h2>Премиум</h2>' + (hasPremium()
+        ? '<span class="small prem-on">Открыт</span>'
+        : '<span class="badge" role="link" tabindex="0" data-goto="#/profile/premium">Открыть</span>') + '</div>' +
+      '<nav class="links">' +
+        link("#/phrases", "📜", "Фразеологический словарь" + lockMark(), window.PHRASES.length + " устойчивых выражений с дословным переводом") +
+        window.PREMIUM_SECTIONS.map(function (sec) {
+          return link("#/prem/" + sec.id, sec.icon, esc(sec.title) + lockMark(), esc(sec.desc));
+        }).join("") +
       '</nav>';
 
     var ht = document.getElementById("hideTip");
@@ -414,6 +423,9 @@
       var hidden = tr.classList.toggle("hidden");
       this.textContent = hidden ? "Показать перевод" : "Скрыть перевод";
     };
+  }
+  function lockMark() {
+    return hasPremium() ? "" : ' <span class="lock-mini" aria-label="Премиум">' + LOCK + '</span>';
   }
   function link(href, ic, t, s) {
     return '<a href="' + href + '"><span class="ic" aria-hidden="true">' + ic + '</span><span><b>' + t + '</b><small>' + s + '</small></span></a>';
@@ -1127,9 +1139,92 @@
     }), "Прослушать " + (open ? "все" : "бесплатные"));
   }
 
+  /* ----- общие премиум-разделы ----- */
+  function getSection(id) {
+    return (window.PREMIUM_SECTIONS || []).filter(function (x) { return x.id === id; })[0] || null;
+  }
+  function itemTitle(sec, it) {
+    if (sec.type === "pairs") return it[0] + " — " + it[1];
+    if (sec.type === "poets") return it.name;
+    return it[0];
+  }
+  function ruBtn(text) {
+    return '<button class="say" data-say="' + esc(text) + '" data-say-lang="ru" aria-label="Прочитать вслух">' + SPEAKER + '</button>';
+  }
+  function renderItem(sec, it, i) {
+    var id = "si" + i;
+    if (sec.type === "pairs") {
+      var mark = sec.id === "antonyms" ? "↔" : "≈";
+      return '<div class="pair" id="' + id + '">' +
+        '<div class="pw">' + sayBtn(it[0], "", it[2]) + '<span><span class="kum">' + esc(it[0]) + '</span><small>' + esc(it[2]) + '</small></span></div>' +
+        '<span class="pmark" aria-hidden="true">' + mark + '</span>' +
+        '<div class="pw">' + sayBtn(it[1], "", it[3]) + '<span><span class="kum">' + esc(it[1]) + '</span><small>' + esc(it[3]) + '</small></span></div></div>';
+    }
+    if (sec.type === "proverbs") {
+      return '<div class="phrase" id="' + id + '">' + sayBtn(it[0], "", it[1]) +
+        '<div class="ptext"><span class="kum">' + esc(it[0]) + '</span><span class="lit">' + esc(it[1]) + '</span>' +
+        '<span class="mean">' + esc(it[2]) + '</span></div></div>';
+    }
+    if (sec.type === "entries") {
+      return '<div class="phrase" id="' + id + '">' + sayBtn(it[0], "", it[1]) +
+        '<div class="ptext"><span class="kum">' + esc(it[0]) + '</span><span class="lit">' + esc(it[1]) + '</span>' +
+        '<span class="mean">' + esc(it[2]) + '</span></div></div>';
+    }
+    if (sec.type === "poets") {
+      return '<article class="card-article" id="' + id + '"><h3>' + esc(it.name) + '</h3><p class="small muted">' + esc(it.years) + '</p>' +
+        '<p>' + esc(it.bio) + '</p>' +
+        (it.poems && it.poems.length
+          ? it.poems.map(function (pm) {
+              return '<div class="poem"><b>' + esc(pm.title) + '</b>' + sayBtn(pm.text) + '<pre class="kum">' + esc(pm.text) + '</pre>' +
+                (pm.ru ? '<pre class="poem-ru">' + esc(pm.ru) + '</pre>' : '') + '</div>';
+            }).join("")
+          : '<p class="small muted">Стихи появятся в следующем обновлении.</p>') + '</article>';
+    }
+    return '<article class="card-article" id="' + id + '"><div class="art-head"><h3>' + esc(it[0]) + '</h3>' + ruBtn(it[0] + ". " + it[1]) + '</div><p>' + esc(it[1]) + '</p></article>';
+  }
+  function premSection(id) {
+    var sec = getSection(id);
+    if (!sec) return home();
+    setScreen(sec.title, "#/home", "home");
+    var open = hasPremium();
+    var free = sec.free || 1;
+    var visible = open ? sec.items : sec.items.slice(0, free);
+    var canListen = sec.type === "pairs" || sec.type === "proverbs" || sec.type === "entries";
+    var listCls = sec.type === "poets" || sec.type === "articles" ? "" : "phrase-list";
+    var html = '<p class="muted">' + esc(sec.desc) + '.</p>' +
+      '<div class="vocab-tools">' +
+        (canListen ? '<button class="play-btn" id="playSec">' + PLAY + '<span>Прослушать ' + (open ? "все" : "бесплатные") + '</span></button>' : '<span></span>') +
+        '<span class="small ' + (open ? "prem-on" : "muted") + '">' + (open ? "Премиум открыт" : "Открыто " + free + " из " + sec.items.length) + '</span>' +
+      '</div>' +
+      '<div class="' + listCls + '">' + visible.map(function (it, i) { return renderItem(sec, it, i); }).join("") + '</div>';
+    if (!open) {
+      var rest = sec.items.length - free;
+      html += '<div class="locked-list" aria-hidden="true">' + sec.items.slice(free, free + 3).map(function (it) {
+          return '<div class="phrase locked"><span class="lock">' + LOCK + '</span><div class="ptext"><span class="kum">' + esc(itemTitle(sec, it)) +
+            '</span><span class="mean blur">••••••• ••••• •••••••••</span></div></div>';
+        }).join("") + '</div>' +
+        '<section class="paywall"><h3>Ещё ' + rest + ' в премиум-доступе</h3>' +
+        '<p>Премиум открывает все разделы сразу: фразеологию, синонимы и антонимы, пословицы, этимологию, стихи и историю.</p>' +
+        '<a class="btn block accent" href="#/premium/' + sec.id + '">Открыть премиум</a></section>';
+    }
+    view.innerHTML = html;
+    if (canListen) {
+      var items = [];
+      visible.forEach(function (it, i) {
+        if (sec.type === "pairs") {
+          items.push({ text: it[0], ru: it[2], pitch: 1, el: "si" + i });
+          items.push({ text: it[1], ru: it[3], pitch: 1, el: "si" + i });
+        } else {
+          items.push({ text: it[0], ru: it[1], pitch: 1, el: "si" + i });
+        }
+      });
+      bindPlayAll(document.getElementById("playSec"), items, "Прослушать " + (open ? "все" : "бесплатные"));
+    }
+  }
+
   function premiumScreen(from) {
-    var backTo = from === "phrases" ? "#/phrases" : "#/profile";
-    setScreen("Премиум", backTo, from === "phrases" ? "home" : "profile");
+    var backTo = from === "phrases" ? "#/phrases" : (getSection(from) ? "#/prem/" + from : "#/profile");
+    setScreen("Премиум", backTo, from === "profile" || !from ? "profile" : "home");
     if (hasPremium()) {
       view.innerHTML = '<div class="result"><div class="big">✓</div><p>Премиум уже открыт. ' + esc(premiumStatus()) + '.</p>' +
         '<a class="btn block" href="#/phrases">К фразеологическому словарю</a></div>';
@@ -1144,8 +1239,9 @@
       view.innerHTML =
         '<div class="test-banner"><b>Тестовый режим</b>Оплата только имитируется, деньги не списываются. Так можно проверить, как работает платный раздел.</div>' +
         '<h2>Что входит</h2>' +
-        '<ul class="perks"><li>Фразеологический словарь целиком: ' + window.PHRASES.length + ' выражений</li>' +
-        '<li>Дословный перевод, значение и озвучка каждого</li><li>Все будущие выражения без доплат</li></ul>' +
+        '<ul class="perks"><li>Фразеологический словарь: ' + window.PHRASES.length + ' выражений</li>' +
+        window.PREMIUM_SECTIONS.map(function (sec) { return '<li>' + esc(sec.title) + '</li>'; }).join("") +
+        '<li>Озвучка и новые материалы без доплат</li></ul>' +
         '<h2>Тариф</h2>' +
         '<div class="plans" role="radiogroup">' + PLANS.map(function (pl) {
           return '<button class="plan' + (pl.id === chosen ? " on" : "") + '" role="radio" aria-checked="' + (pl.id === chosen) + '" data-plan="' + pl.id + '">' +
@@ -1164,7 +1260,7 @@
         timers.push(setTimeout(function () {
           grantPremium(chosen, "test-payment");
           toast("Премиум открыт (тестовый платёж)");
-          location.hash = backTo === "#/phrases" ? "#/phrases" : "#/profile";
+          location.hash = backTo;
         }, 1400));
       };
       document.getElementById("applyPromo").onclick = function () {
@@ -1172,7 +1268,7 @@
         if (PROMO.indexOf(code) >= 0) {
           grantPremium("forever", "promo");
           toast("Промокод принят, премиум открыт");
-          location.hash = "#/phrases";
+          location.hash = backTo === "#/profile" ? "#/phrases" : backTo;
         } else {
           document.getElementById("promoMsg").textContent = code ? "Такого промокода нет. Проверьте написание." : "Введите промокод.";
         }

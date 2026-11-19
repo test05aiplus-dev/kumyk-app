@@ -460,3 +460,27 @@ input { -webkit-user-select: text; user-select: text; }
 .prem-section { border-radius: var(--r-md); margin: 18px -8px 0; padding: 10px 8px 2px; transition: background .4s; }
 .prem-section.focus { background: #FCEFCF; }
 .badge[data-goto] { cursor: pointer; }
+
+/* ---------- премиум-разделы ---------- */
+.group-head { display: flex; align-items: baseline; justify-content: space-between; margin-top: 26px; }
+.group-head h2 { margin: 0 0 6px; }
+.group-head .badge { font-size: 13px; padding: 4px 12px; }
+.lock-mini { display: inline-grid; place-items: center; vertical-align: -2px; margin-left: 4px; color: var(--muted); }
+.lock-mini svg { width: 15px; height: 15px; fill: none; stroke: currentColor; stroke-width: 2.2; }
+.pair { display: flex; align-items: center; gap: 6px; padding: 10px 10px; border-bottom: 1px solid var(--line); transition: background .2s; }
+.pair:last-child { border-bottom: 0; }
+.pair.playing { background: #FCEFCF; }
+.pair .pw { flex: 1; min-width: 0; display: flex; align-items: center; gap: 8px; }
+.pair .pw .kum { display: block; font-size: 17.5px; font-weight: 600; color: var(--indigo); }
+.pair .pw small { display: block; color: var(--muted); font-size: 13.5px; line-height: 1.25; }
+.pair .say { width: 34px; height: 34px; }
+.pair .say svg { width: 18px; height: 18px; }
+.pmark { flex: none; color: var(--pom); font-weight: 600; font-size: 18px; }
+.card-article { background: var(--paper); border: 1px solid var(--line); border-radius: var(--r-md); padding: 16px; margin-bottom: 10px; }
+.card-article h3 { font-family: var(--serif); font-size: 19px; margin: 0 0 4px; }
+.card-article p:last-child { margin-bottom: 0; }
+.art-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 10px; }
+.poem { margin-top: 12px; }
+.poem pre { white-space: pre-wrap; font: inherit; margin: 6px 0 0; }
+.poem pre.kum { font-family: var(--serif); font-size: 17px; }
+.poem-ru { color: var(--muted); }

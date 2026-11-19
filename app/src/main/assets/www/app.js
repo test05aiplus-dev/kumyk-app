@@ -362,6 +362,10 @@
     if (r === "profile") return profile(h[1]);
     if (r === "phrases") return phrases();
     if (r === "prem") return premSection(h[1]);
+    if (r === "community") return community(h[1]);
+    if (r === "services") return services();
+    if (r === "order") return orderForm(h[1]);
+    if (r === "orders") return ordersScreen(h[1]);
     if (r === "premium") return premiumScreen(h[1]);
     home();
   }
@@ -411,7 +415,18 @@
         window.PREMIUM_SECTIONS.map(function (sec) {
           return link("#/prem/" + sec.id, sec.icon, esc(sec.title) + lockMark(), esc(sec.desc));
         }).join("") +
-      '</nav>';
+      '</nav>' +
+      '<h2>Платные услуги</h2>' +
+      '<nav class="links">' +
+        link("#/order/translate", "🔤", esc(window.SERVICES.translate.title), "Документы, письма, поздравления") +
+        link("#/order/writing", "✍️", esc(window.SERVICES.writing.title), "Поздравления, стихи, тосты, посты") +
+        (orders().length ? link("#/orders", "🧾", "Мои заказы", orders().length + " " + plural(orders().length, "заказ", "заказа", "заказов")) : "") +
+      '</nav>' +
+      '<h2>Сообщество</h2>' +
+      '<nav class="links">' + Object.keys(COMMUNITY).map(function (k) {
+        var c = COMMUNITY[k];
+        return link("#/community/" + k, c.icon, c.title, c.desc);
+      }).join("") + '</nav>';
 
     var ht = document.getElementById("hideTip");
     if (ht) ht.onclick = function () {
@@ -1277,6 +1292,349 @@
     draw();
   }
 
+  /* ================= сообщество и платные услуги ================= */
+  // Сервера у приложения нет: всё, что пишет пользователь, сохраняется на телефоне
+  // и отправляется владельцу готовым сообщением (почта / Telegram / WhatsApp).
+  function contacts() { return window.CONTACTS || {}; }
+  function hasContacts() { var c = contacts(); return !!(c.email || c.telegram || c.whatsapp); }
+  function openExternal(url) {
+    if (inNativeApp || /^mailto:/.test(url)) location.href = url;
+    else window.open(url, "_blank");
+  }
+  function sendLinks(subject, body) {
+    var c = contacts(), out = [];
+    if (c.email) out.push({ label: "Отправить на почту", url: "mailto:" + c.email + "?subject=" + encodeURIComponent(subject) + "&body=" + encodeURIComponent(body) });
+    if (c.whatsapp) out.push({ label: "Отправить в WhatsApp", url: "https://wa.me/" + String(c.whatsapp).replace(/\D/g, "") + "?text=" + encodeURIComponent(subject + "\n\n" + body) });
+    if (c.telegram) out.push({ label: "Написать в Telegram", url: "https://t.me/" + String(c.telegram).replace(/^@/, "") });
+    return out;
+  }
+  function sendBlock(subject, body) {
+    var links = sendLinks(subject, body);
+    if (!links.length) {
+      return '<p class="note">Контакты для отправки ещё не указаны (настройка CONTACTS в data.js). Сообщение сохранено в «Моих сообщениях» в профиле.</p>';
+    }
+    var tg = contacts().telegram;
+    return '<div class="stack">' + links.map(function (l, i) {
+        return '<button class="btn block' + (i ? " soft" : "") + '" data-ext="' + esc(l.url) + '">' + l.label + '</button>';
+      }).join("") + '</div>' +
+      (tg ? '<p class="small muted">В Telegram текст не подставляется автоматически — вставьте его в чат:</p><textarea class="copy-box" readonly>' + esc(subject + "\n\n" + body) + '</textarea>' : '');
+  }
+  document.addEventListener("click", function (e) {
+    var el = e.target.closest ? e.target.closest("[data-ext]") : null;
+    if (!el) return;
+    e.preventDefault();
+    openExternal(el.getAttribute("data-ext"));
+  });
+  function stamp() { return new Date().toLocaleString("ru-RU", { day: "numeric", month: "long", hour: "2-digit", minute: "2-digit" }); }
+  function inbox() { if (!store.inbox) store.inbox = []; return store.inbox; }
+  function orders() { if (!store.orders) store.orders = []; return store.orders; }
+  function rub(n) { return String(Math.round(n)).replace(/\B(?=(\d{3})+(?!\d))/g, " ") + " ₽"; }
+
+  var STAR = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3.5l2.6 5.5 6 .8-4.4 4.1 1.1 5.9L12 17l-5.3 2.8 1.1-5.9L3.4 9.8l6-.8z"/></svg>';
+  function starsView(n) {
+    var h = '<span class="stars-view" aria-label="Оценка ' + n + ' из 5">';
+    for (var i = 1; i <= 5; i++) h += '<i class="' + (i <= n ? "on" : "") + '">' + STAR + '</i>';
+    return h + '</span>';
+  }
+
+  var COMMUNITY = {
+    reviews: { title: "Отзывы", icon: "⭐", desc: "Оцените приложение от 1 до 5 звёзд" },
+    ideas: { title: "Предложения", icon: "💡", desc: "Что добавить или улучшить" },
+    feedback: { title: "Обратная связь", icon: "✉️", desc: "Ошибка, вопрос или замечание" },
+    thanks: { title: "Благодарности", icon: "🤲", desc: "Тёплые слова и поддержка проекта" },
+    stories: { title: "Истории учеников", icon: "📝", desc: "Как кумыкский язык вошёл в вашу жизнь" }
+  };
+
+  function community(kind) {
+    var meta = COMMUNITY[kind];
+    if (!meta) return home();
+    setScreen(meta.title, "#/home", "home");
+    var mine = inbox().filter(function (m) { return m.kind === kind; });
+    var html = '';
+
+    if (kind === "reviews") {
+      html += '<p class="muted">Ваша оценка помогает развивать приложение. Отзывы других учеников появятся здесь, когда к приложению подключат сервер.</p>' +
+        '<div class="form-card"><label class="fl">Ваша оценка</label>' +
+        '<div class="stars-input" role="radiogroup" aria-label="Оценка">' + [1, 2, 3, 4, 5].map(function (n) {
+          return '<button class="star" role="radio" aria-checked="false" aria-label="' + n + ' из 5" data-star="' + n + '">' + STAR + '</button>';
+        }).join("") + '</div><p class="small muted" id="starHint">Нажмите на звезду</p>' +
+        '<label class="fl" for="fText">Отзыв</label><textarea id="fText" rows="5" placeholder="Что понравилось, что стоит улучшить"></textarea>' +
+        '<label class="fl" for="fName">Имя (необязательно)</label><input id="fName" value="' + esc(store.name || "") + '">' +
+        '<p class="form-err" id="fErr"></p><button class="btn block accent" id="fSend">Отправить отзыв</button></div>';
+    } else if (kind === "ideas" || kind === "feedback") {
+      var chips = kind === "ideas" ? ["Новый урок или тема", "Улучшение", "Новая функция", "Другое"]
+                                   : ["Ошибка в тексте", "Не работает функция", "Вопрос", "Другое"];
+      html += '<p class="muted">' + (kind === "ideas" ? "Расскажите, чего не хватает в приложении." : "Напишите, если нашли ошибку или хотите что-то спросить.") + '</p>' +
+        '<div class="form-card"><label class="fl">Тема</label><div class="chips">' + chips.map(function (c, i) {
+          return '<button class="chip' + (i === 0 ? " on" : "") + '" data-topic="' + esc(c) + '">' + esc(c) + '</button>';
+        }).join("") + '</div>' +
+        '<label class="fl" for="fText">Сообщение</label><textarea id="fText" rows="6" placeholder="' + (kind === "ideas" ? "Ваше предложение" : "Опишите, что произошло") + '"></textarea>' +
+        '<label class="fl" for="fContact">Как с вами связаться (необязательно)</label><input id="fContact" placeholder="Телефон, Telegram или почта">' +
+        '<p class="form-err" id="fErr"></p><button class="btn block accent" id="fSend">Отправить</button></div>';
+    } else if (kind === "thanks") {
+      html += '<p class="muted">Скажите спасибо авторам курса и, если хотите, поддержите проект.</p>' +
+        '<div class="form-card"><label class="fl" for="fText">Слова благодарности</label><textarea id="fText" rows="4" placeholder="Сав болугъуз!"></textarea>' +
+        '<label class="fl">Поддержать проект (необязательно)</label><div class="chips">' +
+          '<button class="chip on" data-amount="0">Без доната</button>' +
+          window.DONATE_AMOUNTS.map(function (a) { return '<button class="chip" data-amount="' + a + '">' + rub(a) + '</button>'; }).join("") +
+          '<button class="chip" data-amount="custom">Другая сумма</button></div>' +
+        '<input id="fAmount" type="number" inputmode="numeric" min="10" placeholder="Сумма, ₽" hidden>' +
+        (window.PAYMENT.mode === "test" ? '<p class="small muted">Тестовый режим: деньги не списываются.</p>' : '') +
+        '<p class="form-err" id="fErr"></p><button class="btn block accent" id="fSend">Отправить благодарность</button></div>';
+    } else if (kind === "stories") {
+      html += '<p class="muted">Поделитесь своей историей: почему учите кумыкский, что получилось, кого вдохновили. Лучшие истории опубликуем с вашего согласия.</p>' +
+        '<div class="form-card"><label class="fl" for="fTitle">Заголовок</label><input id="fTitle" placeholder="Например: Заговорила с бабушкой по-кумыкски">' +
+        '<label class="fl" for="fText">История</label><textarea id="fText" rows="8"></textarea>' +
+        '<label class="fl" for="fName">Имя и город (необязательно)</label><input id="fName" value="' + esc(store.name || "") + '">' +
+        '<label class="check"><input type="checkbox" id="fAgree"> Согласен(на) на публикацию истории в приложении и соцсетях проекта</label>' +
+        '<p class="form-err" id="fErr"></p><button class="btn block accent" id="fSend">Отправить историю</button></div>';
+    }
+
+    if (mine.length) {
+      html += '<h2>Мои ' + (kind === "reviews" ? "отзывы" : "сообщения") + '</h2>' + mine.slice().reverse().map(function (m) {
+        return '<div class="msg-card">' + (m.stars ? starsView(m.stars) : '') + (m.topic ? '<b>' + esc(m.topic) + '</b>' : '') +
+          (m.title ? '<b>' + esc(m.title) + '</b>' : '') + (m.text ? '<p>' + esc(m.text) + '</p>' : '') +
+          (m.amount ? '<p class="small">Донат: ' + rub(m.amount) + (m.test ? ' (тест)' : '') + '</p>' : '') +
+          '<p class="small muted">' + esc(m.date) + '</p></div>';
+      }).join("");
+    }
+    view.innerHTML = html;
+
+    var stars = 0, topic = null, amount = 0;
+    view.querySelectorAll("[data-star]").forEach(function (b) {
+      b.onclick = function () {
+        stars = +b.getAttribute("data-star");
+        view.querySelectorAll("[data-star]").forEach(function (x) {
+          var on = +x.getAttribute("data-star") <= stars;
+          x.classList.toggle("on", on); x.setAttribute("aria-checked", +x.getAttribute("data-star") === stars);
+        });
+        document.getElementById("starHint").textContent = ["", "Очень плохо", "Плохо", "Нормально", "Хорошо", "Отлично"][stars];
+      };
+    });
+    var firstTopic = view.querySelector("[data-topic]");
+    if (firstTopic) topic = firstTopic.getAttribute("data-topic");
+    view.querySelectorAll("[data-topic]").forEach(function (b) {
+      b.onclick = function () {
+        topic = b.getAttribute("data-topic");
+        view.querySelectorAll("[data-topic]").forEach(function (x) { x.classList.toggle("on", x === b); });
+      };
+    });
+    var amountInput = document.getElementById("fAmount");
+    view.querySelectorAll("[data-amount]").forEach(function (b) {
+      b.onclick = function () {
+        var v = b.getAttribute("data-amount");
+        view.querySelectorAll("[data-amount]").forEach(function (x) { x.classList.toggle("on", x === b); });
+        amountInput.hidden = v !== "custom";
+        amount = v === "custom" ? -1 : +v;
+        if (v === "custom") amountInput.focus();
+        document.getElementById("fSend").textContent = amount > 0 ? "Поблагодарить " + rub(amount) + (window.PAYMENT.mode === "test" ? " (тест)" : "") : (amount === -1 ? "Поблагодарить" : "Отправить благодарность");
+      };
+    });
+
+    var send = document.getElementById("fSend");
+    if (!send) return;
+    send.onclick = function () {
+      var err = document.getElementById("fErr");
+      var text = (document.getElementById("fText") || {}).value || "";
+      text = text.trim();
+      var msg = { kind: kind, date: stamp() };
+      if (kind === "reviews") {
+        if (!stars) { err.textContent = "Поставьте оценку от 1 до 5 звёзд."; return; }
+        msg.stars = stars; msg.text = text; msg.name = document.getElementById("fName").value.trim();
+      } else if (kind === "ideas" || kind === "feedback") {
+        if (text.length < 5) { err.textContent = "Напишите сообщение — хотя бы пару слов."; return; }
+        msg.topic = topic; msg.text = text; msg.contact = document.getElementById("fContact").value.trim();
+      } else if (kind === "thanks") {
+        var a = amount === -1 ? Math.round(+amountInput.value || 0) : amount;
+        if (amount === -1 && a < 10) { err.textContent = "Введите сумму от 10 ₽."; return; }
+        if (!text && !a) { err.textContent = "Напишите пару тёплых слов или выберите сумму."; return; }
+        msg.text = text; msg.amount = a;
+      } else if (kind === "stories") {
+        if (text.length < 20) { err.textContent = "Расскажите чуть подробнее — хотя бы пару предложений."; return; }
+        msg.title = document.getElementById("fTitle").value.trim(); msg.text = text;
+        msg.name = document.getElementById("fName").value.trim(); msg.agree = document.getElementById("fAgree").checked;
+      }
+      err.textContent = "";
+      function finish() {
+        inbox().push(msg); save();
+        var subject = "Къумукъ тил — " + meta.title.toLowerCase();
+        var body = [
+          msg.stars ? "Оценка: " + msg.stars + " из 5" : "",
+          msg.topic ? "Тема: " + msg.topic : "",
+          msg.title ? "Заголовок: " + msg.title : "",
+          msg.text ? msg.text : "",
+          msg.amount ? "Донат: " + rub(msg.amount) + (msg.test ? " (тестовый платёж)" : "") : "",
+          msg.name ? "Имя: " + msg.name : "",
+          msg.contact ? "Контакт: " + msg.contact : "",
+          kind === "stories" ? "Согласие на публикацию: " + (msg.agree ? "да" : "нет") : ""
+        ].filter(Boolean).join("\n");
+        view.innerHTML = '<div class="result"><div class="big">' + (kind === "thanks" ? "🤲" : "✓") + '</div>' +
+          '<p>' + (kind === "thanks" ? (msg.amount ? "Спасибо за поддержку! " : "Спасибо за тёплые слова! ") : "Спасибо! ") +
+          'Осталось отправить сообщение авторам.</p></div>' + sendBlock(subject, body) +
+          '<div style="height:10px"></div><a class="btn block soft" href="#/home">На главную</a>';
+      }
+      if (kind === "thanks" && msg.amount > 0) {
+        pay(msg.amount, "Благодарность авторам", function (test) { msg.test = test; addXp(5); finish(); });
+      } else {
+        addXp(5); finish();
+      }
+    };
+  }
+
+  // Оплата: в тестовом режиме имитируется; при mode "link" открывает страницу оплаты
+  function pay(amount, purpose, done) {
+    var P = window.PAYMENT || { mode: "test" };
+    if (P.mode === "link" && P.url) {
+      openExternal(P.url + (P.url.indexOf("?") >= 0 ? "&" : "?") + "amount=" + amount + "&purpose=" + encodeURIComponent(purpose));
+      done(false);
+      return;
+    }
+    view.innerHTML = '<div class="result"><div class="spinner" aria-hidden="true"></div><p>Проводим тестовый платёж: ' + rub(amount) + '…</p></div>';
+    timers.push(setTimeout(function () { done(true); }, 1400));
+  }
+
+  /* ----- платные услуги ----- */
+  function services() {
+    setScreen("Платные услуги", "#/home", "home");
+    var S = window.SERVICES;
+    view.innerHTML = '<p class="muted">Работу выполняют носители кумыкского языка. Оставьте заказ, оплатите — и с вами свяжутся, чтобы уточнить детали.</p>' +
+      '<a class="svc-card" href="#/order/translate"><span class="ic" aria-hidden="true">🔤</span><span><b>' + esc(S.translate.title) + '</b>' +
+        '<small>' + esc(S.translate.desc) + '</small><span class="svc-price">' + rub(S.translate.perPage) + ' за страницу (' + S.translate.pageChars + ' знаков), от ' + rub(S.translate.min) + '</span></span></a>' +
+      '<a class="svc-card" href="#/order/writing"><span class="ic" aria-hidden="true">✍️</span><span><b>' + esc(S.writing.title) + '</b>' +
+        '<small>' + esc(S.writing.desc) + '</small><span class="svc-price">от ' + rub(S.writing.sizes[0].price) + '</span></span></a>' +
+      (orders().length ? '<a class="btn block soft" href="#/orders">Мои заказы (' + orders().length + ')</a>' : '') +
+      (window.PAYMENT.mode === "test" ? '<p class="note">Тестовый режим: оплата имитируется, деньги не списываются.</p>' : '');
+  }
+
+  function orderForm(type) {
+    var S = window.SERVICES[type];
+    if (!S) return services();
+    setScreen(type === "translate" ? "Заказ перевода" : "Заказ текста", "#/services", "home");
+    var st = { dir: "to", genre: S.genres ? S.genres[0] : "", size: S.sizes ? S.sizes[0].id : "", urgent: false };
+    var html = '<div class="form-card">';
+    if (type === "translate") {
+      html += '<label class="fl">Направление</label><div class="seg" role="group">' +
+          '<button data-dir="to" class="on">Русский → Кумыкский</button><button data-dir="from">Кумыкский → Русский</button></div>' +
+        '<label class="fl" for="oText">Текст для перевода</label><textarea id="oText" rows="7" placeholder="Вставьте текст. Если это файл или большой документ — опишите объём в комментарии."></textarea>' +
+        '<p class="small muted" id="oCount">0 знаков</p>';
+    } else {
+      html += '<label class="fl">Что написать</label><div class="chips">' + S.genres.map(function (g, i) {
+          return '<button class="chip' + (i === 0 ? " on" : "") + '" data-genre="' + esc(g) + '">' + esc(g) + '</button>';
+        }).join("") + '</div>' +
+        '<label class="fl">Объём</label><div class="plans plans3">' + S.sizes.map(function (z, i) {
+          return '<button class="plan' + (i === 0 ? " on" : "") + '" data-size="' + z.id + '"><b>' + z.title + '</b><span class="price">' + rub(z.price) + '</span><small>' + z.note + '</small></button>';
+        }).join("") + '</div>' +
+        '<label class="fl" for="oText">Тема и детали</label><textarea id="oText" rows="6" placeholder="Для кого, повод, имена, настроение, что обязательно упомянуть"></textarea>';
+    }
+    html += '<label class="check"><input type="checkbox" id="oUrgent"> Срочно, за 24 часа (×' + S.urgentRate + ')</label>' +
+      '<label class="fl" for="oComment">Комментарий (необязательно)</label><input id="oComment" placeholder="Пожелания, сроки, формат">' +
+      '<label class="fl" for="oName">Ваше имя</label><input id="oName" value="' + esc(store.name || "") + '">' +
+      '<label class="fl" for="oContact">Как с вами связаться</label><input id="oContact" placeholder="Телефон, Telegram или почта">' +
+      '</div>' +
+      '<div class="total"><span>Итого</span><b id="oTotal"></b></div>' +
+      '<p class="form-err" id="oErr"></p>' +
+      '<button class="btn block accent" id="oPay"></button>' +
+      (window.PAYMENT.mode === "test" ? '<p class="small muted center">Тестовый режим: деньги не списываются.</p>' : '');
+    view.innerHTML = html;
+
+    function price() {
+      var p;
+      if (type === "translate") {
+        var chars = document.getElementById("oText").value.replace(/\s+/g, " ").trim().length;
+        var pages = Math.max(1, Math.ceil(chars / S.pageChars));
+        document.getElementById("oCount").textContent = chars + " знаков, " + pages + " " + plural(pages, "страница", "страницы", "страниц");
+        p = Math.max(S.min, pages * S.perPage);
+      } else {
+        p = S.sizes.filter(function (z) { return z.id === st.size; })[0].price;
+      }
+      if (st.urgent) p = p * S.urgentRate;
+      return Math.round(p);
+    }
+    function refresh() {
+      var p = price();
+      document.getElementById("oTotal").textContent = rub(p);
+      document.getElementById("oPay").textContent = "Оплатить " + rub(p) + (window.PAYMENT.mode === "test" ? " (тест)" : "");
+    }
+    view.querySelectorAll("[data-dir]").forEach(function (b) {
+      b.onclick = function () { st.dir = b.getAttribute("data-dir"); view.querySelectorAll("[data-dir]").forEach(function (x) { x.classList.toggle("on", x === b); }); };
+    });
+    view.querySelectorAll("[data-genre]").forEach(function (b) {
+      b.onclick = function () { st.genre = b.getAttribute("data-genre"); view.querySelectorAll("[data-genre]").forEach(function (x) { x.classList.toggle("on", x === b); }); };
+    });
+    view.querySelectorAll("[data-size]").forEach(function (b) {
+      b.onclick = function () { st.size = b.getAttribute("data-size"); view.querySelectorAll("[data-size]").forEach(function (x) { x.classList.toggle("on", x === b); }); refresh(); };
+    });
+    document.getElementById("oUrgent").onchange = function () { st.urgent = this.checked; refresh(); };
+    document.getElementById("oText").oninput = refresh;
+    refresh();
+
+    document.getElementById("oPay").onclick = function () {
+      var err = document.getElementById("oErr");
+      var text = document.getElementById("oText").value.trim();
+      var comment = document.getElementById("oComment").value.trim();
+      var name = document.getElementById("oName").value.trim();
+      var contact = document.getElementById("oContact").value.trim();
+      if (type === "translate" && !text && !comment) { err.textContent = "Вставьте текст для перевода или опишите объём в комментарии."; return; }
+      if (type === "writing" && text.length < 5) { err.textContent = "Опишите тему и детали текста."; return; }
+      if (!contact) { err.textContent = "Укажите, как с вами связаться."; document.getElementById("oContact").focus(); return; }
+      err.textContent = "";
+      var total = price();
+      var o = {
+        id: "K-" + Date.now().toString(36).slice(-5).toUpperCase(), type: type, title: S.title, date: stamp(), total: total,
+        dir: type === "translate" ? (st.dir === "to" ? "Русский → Кумыкский" : "Кумыкский → Русский") : "",
+        genre: type === "writing" ? st.genre : "",
+        size: type === "writing" ? S.sizes.filter(function (z) { return z.id === st.size; })[0].title : "",
+        urgent: st.urgent, text: text, comment: comment, name: name, contact: contact, status: "new"
+      };
+      if (name && !store.name) store.name = name;
+      pay(total, S.title + " " + o.id, function (test) {
+        o.status = test ? "paid-test" : "awaiting";
+        o.test = test;
+        orders().push(o); save();
+        location.hash = "#/orders/" + o.id;
+      });
+    };
+  }
+
+  function orderBody(o) {
+    return [
+      "Заказ " + o.id + " от " + o.date,
+      "Услуга: " + o.title,
+      o.dir ? "Направление: " + o.dir : "",
+      o.genre ? "Что написать: " + o.genre + (o.size ? ", " + o.size.toLowerCase() : "") : "",
+      o.urgent ? "Срочно, за 24 часа" : "",
+      "Сумма: " + rub(o.total) + (o.test ? " (тестовая оплата)" : ""),
+      o.text ? "\nТекст / детали:\n" + o.text : "",
+      o.comment ? "\nКомментарий: " + o.comment : "",
+      "\nИмя: " + (o.name || "—"),
+      "Связь: " + o.contact
+    ].filter(Boolean).join("\n");
+  }
+  var STATUS = { "paid-test": "Оплачен (тест)", awaiting: "Ожидает оплаты", "new": "Новый" };
+
+  function ordersScreen(id) {
+    if (id) {
+      var o = orders().filter(function (x) { return x.id === id; })[0];
+      if (!o) { location.hash = "#/orders"; return; }
+      setScreen("Заказ " + o.id, "#/orders", "home");
+      view.innerHTML = '<div class="result"><div class="big">✓</div><p>' +
+          (o.test ? "Заказ оплачен (тестовый платёж). " : "Заказ создан. ") + 'Отправьте его исполнителю — так он сразу увидит все детали.</p></div>' +
+        '<div class="order-card"><div class="order-top"><b>' + esc(o.title) + '</b><span class="tag-yes">' + STATUS[o.status] + '</span></div>' +
+          '<p class="small muted">' + esc(o.id) + ', ' + esc(o.date) + '</p>' +
+          (o.dir ? '<p>' + esc(o.dir) + '</p>' : '') + (o.genre ? '<p>' + esc(o.genre) + ', ' + esc(o.size.toLowerCase()) + '</p>' : '') +
+          (o.urgent ? '<p>Срочно, за 24 часа</p>' : '') + '<p class="order-sum">' + rub(o.total) + '</p></div>' +
+        sendBlock("Заказ " + o.id + " — " + o.title, orderBody(o)) +
+        '<div style="height:10px"></div><a class="btn block soft" href="#/services">К услугам</a>';
+      return;
+    }
+    setScreen("Мои заказы", "#/services", "home");
+    var list = orders().slice().reverse();
+    view.innerHTML = list.length ? list.map(function (o) {
+      return '<a class="order-card link" href="#/orders/' + o.id + '"><div class="order-top"><b>' + esc(o.title) + '</b><span class="tag-yes">' + STATUS[o.status] + '</span></div>' +
+        '<p class="small muted">' + esc(o.id) + ', ' + esc(o.date) + '</p><p class="order-sum">' + rub(o.total) + '</p></a>';
+    }).join("") : '<div class="empty">Заказов пока нет. Выберите услугу, чтобы оформить первый.</div><a class="btn block" href="#/services">К услугам</a>';
+  }
+
   /* ================= профиль ================= */
   function voiceInfo() {
     var rec = AUDIO_COUNT ? "Записей носителя языка: " + AUDIO_COUNT + ". " : "Записей носителя языка пока нет. ";
@@ -1306,6 +1664,14 @@
         '<div><b>' + store.sprintBest + '</b><span>рекорд спринта</span></div>' +
         '<div><b>' + store.days.length + '</b><span>' + plural(store.days.length, "день", "дня", "дней") + ' занятий</span></div>' +
       '</div>' +
+      ((store.orders && store.orders.length) || (store.inbox && store.inbox.length)
+        ? '<h2>Мои заказы и сообщения</h2><nav class="links">' +
+            (store.orders && store.orders.length ? link("#/orders", "🧾", "Мои заказы", store.orders.length + " " + plural(store.orders.length, "заказ", "заказа", "заказов")) : "") +
+            (store.inbox && store.inbox.length ? Object.keys(COMMUNITY).filter(function (k) { return store.inbox.some(function (m) { return m.kind === k; }); }).map(function (k) {
+              var n = store.inbox.filter(function (m) { return m.kind === k; }).length;
+              return link("#/community/" + k, COMMUNITY[k].icon, COMMUNITY[k].title, "Отправлено: " + n);
+            }).join("") : "") + '</nav>'
+        : '') +
       '<section id="premSection" class="prem-section"><h2 style="margin-top:0">Премиум</h2>' +
       '<div class="settings"><p class="prem-status">' + esc(premiumStatus()) + '</p>' +
         (hasPremium() ? '<button class="btn block ghost" id="premReset">Отключить премиум (для теста)</button>'

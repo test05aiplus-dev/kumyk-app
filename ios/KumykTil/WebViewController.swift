@@ -3,7 +3,7 @@ import WebKit
 
 /// Показывает тот же офлайн-интерфейс, что и Android-версия (папка www в бандле),
 /// и даёт странице мост KumykNative для озвучки — с тем же API, что на Android.
-final class WebViewController: UIViewController, WKScriptMessageHandler {
+final class WebViewController: UIViewController, WKScriptMessageHandler, WKNavigationDelegate {
     private var webView: WKWebView!
     private let speaker = Speaker()
 
@@ -33,6 +33,7 @@ final class WebViewController: UIViewController, WKScriptMessageHandler {
         web.scrollView.contentInsetAdjustmentBehavior = .never   // отступы под «чёлку» делает CSS (safe-area)
         web.scrollView.bounces = false
         web.allowsBackForwardNavigationGestures = true            // свайп от края — назад
+        web.navigationDelegate = self
         web.isOpaque = false
         web.backgroundColor = UIColor(red: 0xF4 / 255, green: 0xF5 / 255, blue: 0xFA / 255, alpha: 1)
         webView = web
@@ -47,6 +48,14 @@ final class WebViewController: UIViewController, WKScriptMessageHandler {
         }
         guard let dir = Bundle.main.url(forResource: "www", withExtension: nil) else { return }
         webView.loadFileURL(dir.appendingPathComponent("index.html"), allowingReadAccessTo: dir)
+    }
+
+    /// Почта, WhatsApp, Telegram и любые сайты открываются вне приложения.
+    func webView(_ webView: WKWebView, decidePolicyFor navigationAction: WKNavigationAction) async -> WKNavigationActionPolicy {
+        guard let url = navigationAction.request.url else { return .allow }
+        if url.isFileURL || url.scheme == "about" { return .allow }
+        UIApplication.shared.open(url, options: [:], completionHandler: nil)
+        return .cancel
     }
 
     func userContentController(_ userContentController: WKUserContentController, didReceive message: WKScriptMessage) {

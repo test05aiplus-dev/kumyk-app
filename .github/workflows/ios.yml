@@ -22,16 +22,18 @@ jobs:
 
       - name: Сборка для симулятора
         run: |
+          set -o pipefail
           cd ios
           xcodebuild -project KumykTil.xcodeproj -target KumykTil -sdk iphonesimulator \
             -configuration Debug CODE_SIGNING_ALLOWED=NO SYMROOT=build build | tail -40
-          test -d build/Debug-iphonesimulator/KumykTil.app
+          test -f build/Debug-iphonesimulator/KumykTil.app/www/audio-list.js
 
       - name: Запуск в симуляторе
         run: bash .github/scripts/ios-smoke.sh
 
       - name: Сборка для iPhone без подписи
         run: |
+          set -o pipefail
           cd ios
           xcodebuild -project KumykTil.xcodeproj -target KumykTil -sdk iphoneos \
             -configuration Release CODE_SIGNING_ALLOWED=NO SYMROOT=build build | tail -20

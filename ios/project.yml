@@ -46,6 +46,7 @@ targets:
     postBuildScripts:
       - name: Список аудиозаписей
         basedOnDependencyAnalysis: false
+        shell: /bin/bash
         script: |
           AUDIO_DIR="${SRCROOT}/../app/src/main/assets/www/audio"
           OUT="${TARGET_BUILD_DIR}/${UNLOCALIZED_RESOURCES_FOLDER_PATH}/www/audio-list.js"

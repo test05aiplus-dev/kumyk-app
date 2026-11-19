@@ -433,6 +433,7 @@
       }).join("") + '</nav>' +
       '<h2>О проекте</h2>' +
       '<nav class="links">' +
+        '<a href="#" data-ext="' + esc(window.ABOUT.site.url) + '"><span class="ic" aria-hidden="true">🌐</span><span><b>Наш сайт</b><small>' + esc(window.ABOUT.site.title) + ' — курс в браузере</small></span></a>' +
         link("#/social", "📣", "Мы в соцсетях", window.ABOUT.social.map(function (x) { return x.title; }).join(", ")) +
         link("#/contacts", "☎️", "Наши контакты", "Почта и WhatsApp") +
         link("#/team", "👥", "Наша команда", "Кто делает курс") +

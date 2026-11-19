@@ -435,6 +435,7 @@ window.DONATE_AMOUNTS = [100, 300, 500, 1000];
  */
 window.ABOUT = {
   demo: true,
+  site: { title: "кумыкскийязык.рф", url: "https://xn--g1abdcaadk0cr3gg4c.xn--p1ai/" },
   social: [
     { id: "telegram", title: "Telegram", note: "Новости, слово дня, опросы", url: "" },
     { id: "instagram", title: "Instagram", note: "Карточки со словами и видео", url: "" },

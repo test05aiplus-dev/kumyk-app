@@ -21,7 +21,9 @@ final class WebViewController: UIViewController, WKScriptMessageHandler {
           engine: function () { return "\(speaker.engine)"; },
           speak: function (c, l) { window.webkit.messageHandlers.kumyk.postMessage({cmd: "speak", c: String(c), l: String(l), p: 1, id: ""}); },
           speakEx: function (c, l, p, id) { window.webkit.messageHandlers.kumyk.postMessage({cmd: "speak", c: String(c), l: String(l), p: Number(p) || 1, id: String(id)}); },
-          stop: function () { window.webkit.messageHandlers.kumyk.postMessage({cmd: "stop"}); }
+          stop: function () { window.webkit.messageHandlers.kumyk.postMessage({cmd: "stop"}); },
+          hasLang: function (tag) { return String(tag).indexOf("ru") === 0 ? \(speaker.hasLang("ru-RU")) : false; },
+          speakLang: function (t, lang, p, id) { window.webkit.messageHandlers.kumyk.postMessage({cmd: "speakLang", t: String(t), lang: String(lang), p: Number(p) || 1, id: String(id)}); }
         };
         """
         content.addUserScript(WKUserScript(source: bridge, injectionTime: .atDocumentStart, forMainFrameOnly: true))
@@ -58,6 +60,13 @@ final class WebViewController: UIViewController, WKScriptMessageHandler {
             let started = speaker.speak(cyrillic: body["c"] as? String ?? "",
                                         latin: body["l"] as? String ?? "",
                                         pitch: pitch, id: id)
+            if !started && !id.isEmpty { speaker.onDone?(id) }
+        case "speakLang":
+            let id = body["id"] as? String ?? ""
+            let pitch = (body["p"] as? NSNumber)?.floatValue ?? 1
+            let started = speaker.speakLang(text: body["t"] as? String ?? "",
+                                            lang: body["lang"] as? String ?? "ru-RU",
+                                            pitch: pitch, id: id)
             if !started && !id.isEmpty { speaker.onDone?(id) }
         default:
             break

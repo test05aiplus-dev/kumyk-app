@@ -38,6 +38,25 @@ final class Speaker: NSObject, AVSpeechSynthesizerDelegate {
         return true
     }
 
+    /// Есть ли голос для языка, например "ru-RU".
+    func hasLang(_ tag: String) -> Bool {
+        AVSpeechSynthesisVoice(language: tag) != nil
+    }
+
+    /// Произносит текст голосом указанного языка — для русского перевода.
+    func speakLang(text: String, lang: String, pitch: Float, id: String) -> Bool {
+        guard !text.isEmpty, let v = AVSpeechSynthesisVoice(language: lang) else { return false }
+        if synth.isSpeaking { synth.stopSpeaking(at: .immediate) }
+        try? AVAudioSession.sharedInstance().setActive(true)
+        let u = AVSpeechUtterance(string: text)
+        u.voice = v
+        u.rate = AVSpeechUtteranceDefaultSpeechRate * 0.95
+        u.pitchMultiplier = max(0.5, min(2.0, pitch))
+        if !id.isEmpty { ids[ObjectIdentifier(u)] = id }
+        synth.speak(u)
+        return true
+    }
+
     func stop() {
         synth.stopSpeaking(at: .immediate)
     }

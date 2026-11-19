@@ -7,7 +7,7 @@
 
   function blank() {
     return { name: "", xp: 0, lessons: {}, srs: {}, sprintBest: 0, days: [], lastLesson: 1, premium: null,
-             settings: { tts: true, autoCards: true } };
+             settings: { tts: true, autoCards: true, sayRu: true } };
   }
   function load() {
     try {
@@ -154,7 +154,9 @@
     if ("speechSynthesis" in window) return "web";
     return "none";
   }
+  var pairToken = 0;
   function stopSpeech() {
+    pairToken++;
     if (player) { try { player.pause(); } catch (e) {} player = null; }
     if (nativeTts()) { try { window.KumykNative.stop(); } catch (e) {} }
     else if ("speechSynthesis" in window) { try { speechSynthesis.cancel(); } catch (e) {} }
@@ -198,10 +200,57 @@
     }
     return false;
   }
-  // Произносит текст. Возвращает true, если звук запущен.
+  // Русский перевод — русским голосом (телефона или браузера)
+  function cleanRu(t) {
+    return String(t).replace(/\([^)]*\)/g, " ").replace(/[\/;→]/g, ", ").replace(/\s+/g, " ").replace(/\s+([,.!?])/g, "$1").replace(/([,.!?]),/g, "$1").trim();
+  }
+  function ruAvailable() {
+    if (nativeTts()) {
+      if (typeof window.KumykNative.speakLang !== "function") return false;
+      try { return !window.KumykNative.hasLang || !!window.KumykNative.hasLang("ru-RU"); } catch (e) { return false; }
+    }
+    return "speechSynthesis" in window;
+  }
+  function speakRu(text, opts) {
+    opts = opts || {};
+    if (!text || !ruAvailable()) return false;
+    if (nativeTts()) {
+      try {
+        var id = "r" + (++uttSeq);
+        if (opts.onend) pendingTts[id] = opts.onend;
+        window.KumykNative.speakLang(text, "ru-RU", 1, id);
+        return true;
+      } catch (err) { return false; }
+    }
+    var ru = speechSynthesis.getVoices().filter(function (v) { return /^ru/i.test(v.lang); })[0];
+    var u = new SpeechSynthesisUtterance(text);
+    if (ru) u.voice = ru;
+    u.lang = "ru-RU";
+    u.rate = 0.95;
+    if (opts.onend) { u.onend = opts.onend; u.onerror = opts.onend; }
+    speechSynthesis.speak(u);
+    return true;
+  }
+  // Произносит кумыкский текст, затем (если включено) русский перевод opts.ru.
+  // Возвращает true, если звук запущен.
   function say(text, opts) {
     opts = opts || {};
     stopSpeech();
+    var ru = opts.ru && store.settings.sayRu ? cleanRu(opts.ru) : "";
+    if (!ru) return sayKum(text, opts);
+    var token = pairToken, outer = opts.onend;
+    function thenRu() {
+      if (token !== pairToken) return;
+      setTimeout(function () {
+        if (token !== pairToken) return;
+        if (!speakRu(ru, { onend: outer }) && outer) outer();
+      }, 300);
+    }
+    var started = sayKum(text, { pitch: opts.pitch, quiet: true, onend: thenRu });
+    if (!started) { thenRu(); return ruAvailable(); }
+    return true;
+  }
+  function sayKum(text, opts) {
     var f = AUDIO[audioKey(text)];
     if (f) {
       var pl = player = new Audio("audio/" + encodeURIComponent(f));
@@ -244,7 +293,7 @@
       }
       // страховка, если движок речи не сообщит об окончании
       me.watch = setTimeout(fin, Math.max(3000, it.text.length * 170) + 1500);
-      if (!say(it.text, { pitch: it.pitch, onend: fin, quiet: true })) {
+      if (!say(it.text, { pitch: it.pitch, ru: it.ru, onend: fin, quiet: true })) {
         clearTimeout(me.watch);
         me.watch = setTimeout(fin, 1200);
       }
@@ -255,8 +304,9 @@
   var CHEV_L = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 5l-7 7 7 7"/></svg>';
   var CHEV_R = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 5l7 7-7 7"/></svg>';
   var SPEAKER = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9h4l5-4v14l-5-4H4z"/><path d="M16.5 8.5a5 5 0 010 7M19 6a8.5 8.5 0 010 12"/></svg>';
-  function sayBtn(text, extra) {
-    return '<button class="say' + (extra ? " " + extra : "") + '" data-say="' + esc(text) + '" aria-label="Произнести «' + esc(text) + '»">' + SPEAKER + '</button>';
+  function sayBtn(text, extra, ru) {
+    return '<button class="say' + (extra ? " " + extra : "") + '" data-say="' + esc(text) + '"' + (ru ? ' data-say-ru="' + esc(ru) + '"' : '') +
+      ' aria-label="Произнести «' + esc(text) + '»">' + SPEAKER + '</button>';
   }
   // Перехватываем нажатия на всё с data-say раньше остальных обработчиков
   document.addEventListener("click", function (e) {
@@ -264,7 +314,7 @@
     if (!el) return;
     stopSeq();
     if (el.classList.contains("say")) { e.stopPropagation(); e.preventDefault(); }
-    say(el.getAttribute("data-say"), { pitch: parseFloat(el.getAttribute("data-pitch")) || 1 });
+    say(el.getAttribute("data-say"), { pitch: parseFloat(el.getAttribute("data-pitch")) || 1, ru: el.getAttribute("data-say-ru") });
   }, true);
 
   function setScreen(title, back, tab) {
@@ -321,7 +371,7 @@
     view.innerHTML = installTip() +
       '<section class="wod">' +
         '<div class="label">Слово дня</div>' +
-        '<div class="word-row"><p class="word kum">' + esc(w.k) + '</p>' + sayBtn(w.k, "light") + '</div>' +
+        '<div class="word-row"><p class="word kum">' + esc(w.k) + '</p>' + sayBtn(w.k, "light", w.r) + '</div>' +
         '<div class="tr hidden" id="wodTr">' + esc(w.r) + '</div>' +
         '<button id="wodBtn">Показать перевод</button>' +
       '</section>' +
@@ -417,7 +467,7 @@
     var html = l.theory.map(function (t) {
       return '<section class="theory-block"><h3>' + esc(t.h) + '</h3><p>' + esc(t.p) + '</p>' +
         (t.ex ? '<div class="ex-table">' + t.ex.map(function (e) {
-          return '<div><span class="kum ex-say" data-say="' + esc(e[0].split("→").pop().trim()) + '" role="button" tabindex="0">' + esc(e[0]) + '</span><span>' + esc(e[1]) + '</span></div>';
+          return '<div><span class="kum ex-say" data-say="' + esc(e[0].split("→").pop().trim()) + '" data-say-ru="' + esc(e[1].split("→").pop().trim()) + '" role="button" tabindex="0">' + esc(e[0]) + '</span><span>' + esc(e[1]) + '</span></div>';
         }).join("") + '</div>' : '') + '</section>';
     }).join("");
     view.innerHTML = html + finishBar(l, "theory");
@@ -434,11 +484,11 @@
         '<div class="vocab-tools"><button class="play-btn" id="playAll">' + PLAY + '<span>Прослушать все</span></button>' +
         '<button class="switch" id="hideSw" aria-pressed="' + hide + '"><i></i>Проверить себя</button></div>' +
         '<div class="wordlist">' + l.words.map(function (w, i) {
-          return '<div class="vrow" id="v' + i + '">' + sayBtn(w[0]) + '<button class="vword" data-i="' + i + '"><span class="kum">' + esc(w[0]) + '</span><span class="ru' + (hide ? " hide" : "") + '">' + esc(w[1]) + '</span></button></div>';
+          return '<div class="vrow" id="v' + i + '">' + sayBtn(w[0], "", w[1]) + '<button class="vword" data-i="' + i + '"><span class="kum">' + esc(w[0]) + '</span><span class="ru' + (hide ? " hide" : "") + '">' + esc(w[1]) + '</span></button></div>';
         }).join("") + '</div><div style="height:16px"></div>' + finishBar(l, "vocab");
       document.getElementById("hideSw").onclick = function () { hide = !hide; draw(); };
       bindPlayAll(document.getElementById("playAll"), l.words.map(function (w, i) {
-        return { text: w[0], pitch: 1, el: "v" + i };
+        return { text: w[0], ru: w[1], pitch: 1, el: "v" + i };
       }), "Прослушать все");
       view.querySelectorAll(".wordlist .vword").forEach(function (b) {
         b.onclick = function () { b.querySelector(".ru").classList.toggle("hide"); };
@@ -493,7 +543,7 @@
         '<div class="progress"><i style="width:' + (i / deck.length * 100) + '%"></i></div>' +
         '<div class="card-stage"><div class="flash" id="flash" role="button" tabindex="0" aria-label="Перевернуть карточку">' +
           '<div class="face front">' + sayBtn(w[0], "corner") + '<div class="big kum">' + esc(w[0]) + '</div><div class="hint">Нажмите, чтобы перевернуть</div></div>' +
-          '<div class="face back"><div class="big">' + esc(w[1]) + '</div><div class="hint">Помните это слово?</div></div>' +
+          '<div class="face back">' + sayBtn(w[0], "corner light", w[1]) + '<div class="big">' + esc(w[1]) + '</div><div class="hint">Помните это слово?</div></div>' +
         '</div></div>' +
         '<div class="row"><button class="btn ghost" id="no">Не помню</button><button class="btn" id="yes">Помню</button></div>' +
         '<div class="card-nav">' +
@@ -503,7 +553,10 @@
         '<button class="skip-all" id="skipAll">Пропустить всё</button>';
       var f = document.getElementById("flash");
       if (store.settings.autoCards && canSay(w[0])) timers.push(setTimeout(function () { say(w[0]); }, 250));
-      function flip() { f.classList.toggle("flipped"); }
+      function flip() {
+        var toBack = f.classList.toggle("flipped");
+        if (toBack && store.settings.autoCards && store.settings.sayRu) { stopSpeech(); speakRu(cleanRu(w[1])); }
+      }
       f.onclick = flip;
       f.onkeydown = function (e) { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); flip(); } };
       document.getElementById("yes").onclick = function () { snapshot(w); srsAnswer(w[0], true); status[w[0]] = "yes"; known++; addXp(2); i++; draw(); };
@@ -533,7 +586,7 @@
       var label = { yes: "Помню", no: "Повторить", skip: "Пропущено" };
       var rows = uniq.map(function (w) {
         var st = status[w[0]] || "skip";
-        return '<tr class="st-' + st + '"><td>' + sayBtn(w[0]) + '</td><td class="kum">' + esc(w[0]) + '</td><td>' + esc(w[1]) + '</td><td><span class="tag-' + st + '">' + label[st] + '</span></td></tr>';
+        return '<tr class="st-' + st + '"><td>' + sayBtn(w[0], "", w[1]) + '</td><td class="kum">' + esc(w[0]) + '</td><td>' + esc(w[1]) + '</td><td><span class="tag-' + st + '">' + label[st] + '</span></td></tr>';
       }).join("");
       var skippedWords = uniq.filter(function (w) { return (status[w[0]] || "skip") === "skip"; });
 
@@ -646,6 +699,13 @@
 
   /* ================= вопросы (общий движок) ================= */
   /* Как понять, что строка на кумыкском: слова из уроков, словаря, примеров и диалогов */
+  var KUM2RU = {};
+  DICT.forEach(function (w) { KUM2RU[audioKey(w.k)] = w.r; });
+  window.DIALOGS.forEach(function (d) { d.lines.forEach(function (ln) { var k = audioKey(ln[1]); if (!KUM2RU[k]) KUM2RU[k] = ln[2]; }); });
+  window.PROVERBS.forEach(function (p) { var k = audioKey(p[0]); if (!KUM2RU[k]) KUM2RU[k] = p[1]; });
+  LESSONS.forEach(function (l) { l.theory.forEach(function (t) { (t.ex || []).forEach(function (e) {
+    var k = audioKey(e[0].split("→").pop()); if (!KUM2RU[k]) KUM2RU[k] = e[1].split("→").pop().trim();
+  }); }); });
   var KUM_TOKENS = {};
   function addKum(t) {
     audioKey(t).split(/[\s\-]+/).forEach(function (w) { if (w && !/^\d+$/.test(w)) KUM_TOKENS[w] = 1; });
@@ -743,14 +803,19 @@
             else if (xi === chosen) x.classList.add("wrong");
           });
           var correct = it.options[it.a];
-          var heard = filledSentence(it.q, correct) || (kf[it.a] ? correct : qk);
+          var filled = filledSentence(it.q, correct);
+          var heard = filled || (kf[it.a] ? correct : qk);
+          var heardRu = null;
+          if (filled) { var pm = it.q.match(/\(([^)]+)\)/); heardRu = pm ? pm[1] : null; }
+          else if (kf[it.a]) heardRu = KUM2RU[audioKey(correct)] || null;
+          else if (qk) heardRu = correct;
           document.getElementById("fb").innerHTML =
             '<div class="explain ' + (ok ? "ok" : "bad") + '"><b>' + (ok ? "Верно" : "Правильно: " + esc(correct)) + '</b>' + esc(it.why || "") +
-            (heard ? '<button class="listen" data-say="' + esc(heard) + '">' + SPEAKER + '<span class="kum">' + esc(heard) + '</span></button>' : '') + '</div>' +
+            (heard ? '<button class="listen" data-say="' + esc(heard) + '"' + (heardRu ? ' data-say-ru="' + esc(heardRu) + '"' : '') + '>' + SPEAKER + '<span class="kum">' + esc(heard) + '</span></button>' : '') + '</div>' +
             '<div style="height:12px"></div><button class="btn block" id="nx">' + (i + 1 < items.length ? "Следующий вопрос" : "Посмотреть результат") + '</button>';
           document.getElementById("nx").onclick = function () { i++; draw(); };
           document.getElementById("nx").focus();
-          if (heard && store.settings.autoCards) say(heard, { quiet: true });
+          if (heard && store.settings.autoCards) say(heard, { quiet: true, ru: heardRu });
         };
       });
     }
@@ -922,7 +987,7 @@
       var a = kr ? '<span class="kum">' + hl(w.k, q) + '</span>' : '<span>' + hl(w.r, q) + '</span>';
       var b = kr ? '<span class="ru">' + esc(w.r) : '<span class="ru kum" style="font-size:17px;color:var(--indigo);font-weight:600">' + esc(w.k);
       b += (w.lesson ? '<span class="tag">урок ' + w.lesson + '</span>' : '') + '</span>';
-      return '<div class="item">' + sayBtn(w.k) + '<span class="dmain">' + a + b + '</span></div>';
+      return '<div class="item">' + sayBtn(w.k, "", w.r) + '<span class="dmain">' + a + b + '</span></div>';
     }).join("");
   }
 
@@ -967,15 +1032,15 @@
           return '<section class="dialog"><div class="dialog-head"><h3>' + esc(d.title) + '</h3>' +
             '<button class="play-btn" data-dialog="' + di + '">' + PLAY + '<span>Слушать</span></button></div>' +
             d.lines.map(function (ln, li) {
-              return '<div class="bubble ' + (ln[0] === "А" ? "a" : "b") + '" id="b' + di + '_' + li + '" data-say="' + esc(ln[1]) + '" data-pitch="' + (ln[0] === "А" ? 1.1 : 0.82) + '" role="button" tabindex="0">' +
+              return '<div class="bubble ' + (ln[0] === "А" ? "a" : "b") + '" id="b' + di + '_' + li + '" data-say="' + esc(ln[1]) + '" data-say-ru="' + esc(ln[2]) + '" data-pitch="' + (ln[0] === "А" ? 1.1 : 0.82) + '" role="button" tabindex="0">' +
                 '<span class="kum">' + esc(ln[1]) + '</span><span class="ru">' + esc(ln[2]) + '</span></div>';
             }).join("") + '</section>';
         }).join("") +
         '<div class="dialog-head proverbs-head"><h2>Пословицы</h2>' +
         '<button class="play-btn" id="playProv">' + PLAY + '<span>Слушать все</span></button></div>' +
         window.PROVERBS.map(function (p, pi) {
-          return '<div class="proverb" id="p' + pi + '">' + sayBtn(p[0]) +
-            '<span class="ptext" data-say="' + esc(p[0]) + '" role="button" tabindex="0"><span class="kum">' + esc(p[0]) + '</span><span class="ru">' + esc(p[1]) + '</span></span></div>';
+          return '<div class="proverb" id="p' + pi + '">' + sayBtn(p[0], "", p[1]) +
+            '<span class="ptext" data-say="' + esc(p[0]) + '" data-say-ru="' + esc(p[1]) + '" role="button" tabindex="0"><span class="kum">' + esc(p[0]) + '</span><span class="ru">' + esc(p[1]) + '</span></span></div>';
         }).join("") + '</div>';
 
       document.getElementById("sw").onclick = function () { hideRu = !hideRu; draw(); };
@@ -984,11 +1049,11 @@
         var di = +btn.getAttribute("data-dialog");
         // у собеседников разная высота голоса, чтобы их было легко различить
         bindPlayAll(btn, window.DIALOGS[di].lines.map(function (ln, li) {
-          return { text: ln[1], pitch: ln[0] === "А" ? 1.1 : 0.82, el: "b" + di + "_" + li };
+          return { text: ln[1], ru: ln[2], pitch: ln[0] === "А" ? 1.1 : 0.82, el: "b" + di + "_" + li };
         }), "Слушать");
       });
       bindPlayAll(document.getElementById("playProv"), window.PROVERBS.map(function (p, pi) {
-        return { text: p[0], pitch: 1, el: "p" + pi };
+        return { text: p[0], ru: p[1], pitch: 1, el: "p" + pi };
       }), "Слушать все");
     }
     draw();
@@ -1024,7 +1089,7 @@
   var LOCK = '<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V8a4 4 0 018 0v3"/></svg>';
 
   function phraseRow(p, i) {
-    return '<div class="phrase" id="ph' + i + '">' + sayBtn(p[0]) +
+    return '<div class="phrase" id="ph' + i + '">' + sayBtn(p[0], "", p[2]) +
       '<div class="ptext"><span class="kum">' + esc(p[0]) + '</span>' +
       '<span class="lit">дословно: «' + esc(p[1]) + '»</span>' +
       '<span class="mean">' + esc(p[2]) + '</span></div></div>';
@@ -1053,7 +1118,7 @@
     }
     view.innerHTML = html;
     bindPlayAll(document.getElementById("playPh"), visible.map(function (p, i) {
-      return { text: p[0], pitch: 1, el: "ph" + i };
+      return { text: p[0], ru: p[2], pitch: 1, el: "ph" + i };
     }), "Прослушать " + (open ? "все" : "бесплатные"));
   }
 
@@ -1148,6 +1213,7 @@
       '<h2>Озвучка</h2>' +
       '<div class="settings">' +
         '<button class="switch wide" id="setTts" aria-pressed="' + store.settings.tts + '"><span>Синтез речи для слов без записи</span><i></i></button>' +
+        '<button class="switch wide" id="setRu" aria-pressed="' + store.settings.sayRu + '"><span>Озвучивать перевод на русский</span><i></i></button>' +
         '<button class="switch wide" id="setAuto" aria-pressed="' + store.settings.autoCards + '"><span>Произносить сразу: слово на карточке и правильный ответ в упражнениях</span><i></i></button>' +
         '<button class="btn soft block" id="testVoice">' + SPEAKER + ' Проверить: «Ассаламу алайкум»</button>' +
         '<p class="small muted" id="voiceInfo">' + voiceInfo() + '</p>' +
@@ -1163,12 +1229,15 @@
       store.settings.tts = !store.settings.tts; save(); this.setAttribute("aria-pressed", store.settings.tts);
       document.getElementById("voiceInfo").textContent = voiceInfo();
     };
+    document.getElementById("setRu").onclick = function () {
+      store.settings.sayRu = !store.settings.sayRu; save(); this.setAttribute("aria-pressed", store.settings.sayRu);
+    };
     document.getElementById("setAuto").onclick = function () {
       store.settings.autoCards = !store.settings.autoCards; save(); this.setAttribute("aria-pressed", store.settings.autoCards);
     };
     var pr = document.getElementById("premReset");
     if (pr) pr.onclick = function () { store.premium = null; save(); toast("Премиум отключён"); profile(); };
-    document.getElementById("testVoice").onclick = function () { say("Ассаламу алайкум"); };
+    document.getElementById("testVoice").onclick = function () { say("Ассаламу алайкум", { ru: "Здравствуйте" }); };
     var armed = false;
     document.getElementById("reset").onclick = function () {
       if (!armed) { armed = true; this.textContent = "Нажмите ещё раз, чтобы стереть всё"; this.classList.add("accent"); this.classList.remove("ghost"); return; }

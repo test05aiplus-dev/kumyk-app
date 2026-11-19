@@ -380,6 +380,8 @@ p { margin: 0 0 10px; }
 .say.light { background: rgba(255,255,255,.16); color: #fff; width: 48px; height: 48px; }
 .say.light svg { width: 24px; height: 24px; }
 .say.corner { position: absolute; top: 24px; right: 14px; }
+.face.back .say.light { background: rgba(255,255,255,.16); color: #fff; width: 40px; height: 40px; }
+.face.back .say.light svg { width: 21px; height: 21px; }
 .word-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
 .ex-say { cursor: pointer; text-decoration: underline dotted rgba(34,48,107,.35); text-underline-offset: 4px; }
 .bubble, .proverb { cursor: pointer; }

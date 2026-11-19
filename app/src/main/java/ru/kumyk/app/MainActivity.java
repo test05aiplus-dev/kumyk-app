@@ -46,6 +46,8 @@ public class MainActivity extends Activity {
     private TextToSpeech tts;
     /** "loading", "tr", "ru" или "none" — какой голос сейчас доступен. */
     private volatile String ttsLang = "loading";
+    /** Язык голоса для кумыкского текста (турецкий или русский). */
+    private volatile Locale kumykLocale = null;
 
     @SuppressLint("SetJavaScriptEnabled")
     @Override
@@ -129,9 +131,11 @@ public class MainActivity extends Activity {
             if (tts.isLanguageAvailable(tr) >= TextToSpeech.LANG_AVAILABLE
                     && tts.setLanguage(tr) >= TextToSpeech.LANG_AVAILABLE) {
                 ttsLang = "tr";
+                kumykLocale = tr;
             } else if (tts.isLanguageAvailable(ru) >= TextToSpeech.LANG_AVAILABLE
                     && tts.setLanguage(ru) >= TextToSpeech.LANG_AVAILABLE) {
                 ttsLang = "ru";
+                kumykLocale = ru;
             } else {
                 ttsLang = "none";
             }
@@ -193,6 +197,36 @@ public class MainActivity extends Activity {
             } else if ("ru".equals(lang)) {
                 text = cyrillic;
             } else {
+                return;
+            }
+            Locale loc = kumykLocale;
+            if (loc != null) t.setLanguage(loc);
+            t.setPitch(Math.max(0.5f, Math.min(2f, pitch)));
+            t.speak(text, TextToSpeech.QUEUE_FLUSH, null, id);
+        }
+
+        /** Есть ли на телефоне голос для языка, например "ru-RU". */
+        @JavascriptInterface
+        public boolean hasLang(String tag) {
+            TextToSpeech t = tts;
+            if (t == null || "loading".equals(ttsLang)) return false;
+            try {
+                return t.isLanguageAvailable(Locale.forLanguageTag(tag)) >= TextToSpeech.LANG_AVAILABLE;
+            } catch (Exception e) {
+                return false;
+            }
+        }
+
+        /** Произносит текст голосом указанного языка — для русского перевода. */
+        @JavascriptInterface
+        public void speakLang(String text, String tag, float pitch, String id) {
+            TextToSpeech t = tts;
+            if (t == null || text == null || text.isEmpty()) {
+                notifyDone(id);
+                return;
+            }
+            if (t.setLanguage(Locale.forLanguageTag(tag)) < TextToSpeech.LANG_AVAILABLE) {
+                notifyDone(id);
                 return;
             }
             t.setPitch(Math.max(0.5f, Math.min(2f, pitch)));
